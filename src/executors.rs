@@ -5,6 +5,20 @@ extern crate serde_json;
 use serde::{Deserialize, Serialize};
 
 const HISTORY_PREFIX: &'static str = "history_";
+const CONFIG_FILE: &'static str = "config";
+
+fn default_path() -> Result<std::path::PathBuf, &'static str> {
+    std::env::var("VAI_CONFIG")
+        .map(|var| std::path::PathBuf::from(var))
+        .or_else(|_| match dirs::config_dir() {
+            Some(path) => Ok(path.join("vai")),
+            None => Err("Could not infer HOME directory"),
+        })
+}
+
+fn map_error<E: std::string::ToString, T>(err: E) -> Result<T, String> {
+    Err(err.to_string())
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executor {
@@ -18,38 +32,18 @@ pub struct Executors {
     executors: Vec<Executor>,
 }
 
-pub fn load_mock() -> Result<Executors, String> {
-    Ok(Executors {
-        executors: vec![
-            Executor {
-                name: String::from("N One"),
-                command: String::from("C One"),
-                suggestion: String::from("S One"),
-            },
-            Executor {
-                name: String::from("N Two"),
-                command: String::from("C Two"),
-                suggestion: String::from("S Two"),
-            },
-        ],
-    })
-}
-
 pub fn load_default() -> Result<Executors, String> {
-    load(
-        std::env::var("VAI_CONFIG")
-            .map(|var| std::path::PathBuf::from(var))
-            .or_else(|_| match dirs::config_dir() {
-                Some(path) => Ok(path.join("vai").join("config")),
-                None => Err("Could not infer HOME directory"),
-            })?,
-    )
+    load(default_path()?.join(CONFIG_FILE))
 }
 
-pub fn load<P: AsRef<std::path::Path>>(config_path: P) -> Result<Executors, String> {
-    let config = std::fs::read(config_path).or_else(|err| Err(err.to_string()))?;
-    let executors: Executors =
-        bincode::deserialize(&config[..]).or_else(|err| Err(err.to_string()))?;
+pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors, String> {
+    let config = std::fs::read(&path).or_else(map_error)?;
+    let executors: Executors = bincode::deserialize(&config[..]).or_else(map_error)?;
+    Ok(executors)
+}
+
+pub fn load_from_stdin() -> Result<Executors, String> {
+    let executors: Executors = serde_json::from_reader(std::io::stdin()).or_else(map_error)?;
     Ok(executors)
 }
 
@@ -59,14 +53,20 @@ impl Executor {
 }
 
 impl Executors {
+    pub fn save_default(&self) -> Result<(), String> {
+        self.save(default_path()?.join(CONFIG_FILE))
+    }
+
     pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), String> {
-        let bytes = bincode::serialize(&self.executors).or_else(|err| Err(err.to_string()))?;
-        std::fs::write(path, bytes).or_else(|err| Err(err.to_string()))
+        let bytes = bincode::serialize(&self.executors).or_else(map_error)?;
+        if let Some(parent) = path.as_ref().parent() {
+            std::fs::create_dir_all(&parent).or_else(map_error)?;
+        }
+        std::fs::write(&path, bytes).or_else(map_error)
     }
 
     pub fn to_json(&self) -> Result<String, String> {
-        let json =
-            serde_json::to_string_pretty(&self.executors).or_else(|err| Err(err.to_string()))?;
+        let json = serde_json::to_string_pretty(&self.executors).or_else(map_error)?;
         println!("{}", json);
         Ok(json)
     }
