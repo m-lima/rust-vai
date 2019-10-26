@@ -45,24 +45,9 @@ pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors, error::Erro
 }
 
 pub fn load_from_stdin() -> Result<Executors, error::Error> {
-    let executors: Executors = serde_json::from_reader(std::io::stdin())
+    let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())
         .map_err(|e| error::new("executors::load_from_stdin", e))?;
-
-////    let executors: Executors = serde_json::from_reader(std::io::BufReader::new(std::io::stdin()))
-////        .map_err(|e| error::new("executors::load_from_stdin", e))?;
-//
-//    use std::io::Read;
-//
-//    let mut bytes = [0u8; 1024];
-//    let mut json = String::new();
-//    while std::io::stdin().read(&mut bytes).map_err(|e| error::new("executors::load_from_stdin::read", e))? == 1024usize {
-//        json.push_str(String::from\(&bytes[..]).as_str());
-//    }
-//
-//    let executors: Executors = serde_json::from_str(json.as_str())
-//        .map_err(|e| error::new("executors::load_from_stdin", e))?;
-
-    Ok(executors)
+    Ok(Executors{executors})
 }
 
 impl Executor {
@@ -119,7 +104,7 @@ mod tests {
     use super::*;
 
     #[test]
-//    #[should_panic(expected = "No such file or directory (os error 2)")]
+    //    #[should_panic(expected = "No such file or directory (os error 2)")]
     fn test_json_roundtrip() {
         let executors = Executors {
             executors: vec![
@@ -133,7 +118,7 @@ mod tests {
                     command: "cb".to_owned(),
                     suggestion: "sb".to_owned(),
                 },
-            ]
+            ],
         };
 
         let json = serde_json::to_string_pretty(&executors).unwrap();

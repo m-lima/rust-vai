@@ -6,17 +6,12 @@ fn support_mode() -> Result<(), error::Error> {
     match std::env::args().nth(2) {
         Some(arg) => match arg.as_str() {
             "r" => executors::load_from_stdin()?.save_default(),
-            "w" => {
-                executors::load_default()?.to_json()
-            }
+            "w" => executors::load_default()?.to_json(),
             "t" => {
                 executors::load_default()?.list_targets();
                 Ok(())
             }
-            "c" => {
-                //                std::env::args().nth(3).map(|t| executors::load_default()?.find(t)?.)
-                Ok(())
-            }
+            "c" => Ok(()),
             cmd => Err(error::new(
                 "main::support_mode",
                 format!("Command not recognized: {}", cmd),
