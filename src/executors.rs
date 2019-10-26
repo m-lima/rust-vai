@@ -2,6 +2,7 @@ extern crate bincode;
 extern crate dirs;
 extern crate serde_json;
 
+use super::error;
 use serde::{Deserialize, Serialize};
 
 const HISTORY_PREFIX: &'static str = "history_";
@@ -16,10 +17,6 @@ fn default_path() -> Result<std::path::PathBuf, &'static str> {
         })
 }
 
-fn map_error<E: std::string::ToString, T>(err: E) -> Result<T, String> {
-    Err(err.to_string())
-}
-
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executor {
     name: String,
@@ -32,18 +29,39 @@ pub struct Executors {
     executors: Vec<Executor>,
 }
 
-pub fn load_default() -> Result<Executors, String> {
-    load(default_path()?.join(CONFIG_FILE))
+pub fn load_default() -> Result<Executors, error::Error> {
+    load(
+        default_path()
+            .map_err(|e| error::new("executors::load_default::default_path", e))?
+            .join(CONFIG_FILE),
+    )
 }
 
-pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors, String> {
-    let config = std::fs::read(&path).or_else(map_error)?;
-    let executors: Executors = bincode::deserialize(&config[..]).or_else(map_error)?;
+pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors, error::Error> {
+    let config = std::fs::read(&path).map_err(|e| error::new("executors::load::read", e))?;
+    let executors: Executors = bincode::deserialize(&config[..])
+        .map_err(|e| error::new("executors::load::deserialize", e))?;
     Ok(executors)
 }
 
-pub fn load_from_stdin() -> Result<Executors, String> {
-    let executors: Executors = serde_json::from_reader(std::io::stdin()).or_else(map_error)?;
+pub fn load_from_stdin() -> Result<Executors, error::Error> {
+    let executors: Executors = serde_json::from_reader(std::io::stdin())
+        .map_err(|e| error::new("executors::load_from_stdin", e))?;
+
+////    let executors: Executors = serde_json::from_reader(std::io::BufReader::new(std::io::stdin()))
+////        .map_err(|e| error::new("executors::load_from_stdin", e))?;
+//
+//    use std::io::Read;
+//
+//    let mut bytes = [0u8; 1024];
+//    let mut json = String::new();
+//    while std::io::stdin().read(&mut bytes).map_err(|e| error::new("executors::load_from_stdin::read", e))? == 1024usize {
+//        json.push_str(String::from\(&bytes[..]).as_str());
+//    }
+//
+//    let executors: Executors = serde_json::from_str(json.as_str())
+//        .map_err(|e| error::new("executors::load_from_stdin", e))?;
+
     Ok(executors)
 }
 
@@ -53,22 +71,37 @@ impl Executor {
 }
 
 impl Executors {
-    pub fn save_default(&self) -> Result<(), String> {
-        self.save(default_path()?.join(CONFIG_FILE))
-    }
-
-    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), String> {
-        let bytes = bincode::serialize(&self.executors).or_else(map_error)?;
-        if let Some(parent) = path.as_ref().parent() {
-            std::fs::create_dir_all(&parent).or_else(map_error)?;
+    pub fn list_targets(&self) {
+        for executor in &self.executors {
+            println!("{}", &executor.name);
         }
-        std::fs::write(&path, bytes).or_else(map_error)
     }
 
-    pub fn to_json(&self) -> Result<String, String> {
-        let json = serde_json::to_string_pretty(&self.executors).or_else(map_error)?;
-        println!("{}", json);
-        Ok(json)
+    pub fn save_default(&self) -> Result<(), error::Error> {
+        self.save(
+            default_path()
+                .map_err(|e| error::new("executors::save_default::default_path", e))?
+                .join(CONFIG_FILE),
+        )
+    }
+
+    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), error::Error> {
+        let bytes = bincode::serialize(&self.executors)
+            .map_err(|e| error::new("executors::save::serialize", e))?;
+        if let Some(parent) = path.as_ref().parent() {
+            std::fs::create_dir_all(&parent)
+                .map_err(|e| error::new("executors::save::create_dir_all", e))?;
+        }
+        std::fs::write(&path, bytes).map_err(|e| error::new("executors::save::write", e))
+    }
+
+    pub fn to_json(&self) -> Result<(), error::Error> {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&self.executors)
+                .map_err(|e| error::new("executors::to_json", e))?
+        );
+        Ok(())
     }
 
     pub fn find(&self, name: String) -> Option<&Executor> {
@@ -86,8 +119,25 @@ mod tests {
     use super::*;
 
     #[test]
-    #[should_panic(expected = "No such file or directory (os error 2)")]
-    fn test_no_env_no_file() {
-        load_default().unwrap();
+//    #[should_panic(expected = "No such file or directory (os error 2)")]
+    fn test_json_roundtrip() {
+        let executors = Executors {
+            executors: vec![
+                Executor {
+                    name: "na".to_owned(),
+                    command: "ca".to_owned(),
+                    suggestion: "sa".to_owned(),
+                },
+                Executor {
+                    name: "nb".to_owned(),
+                    command: "cb".to_owned(),
+                    suggestion: "sb".to_owned(),
+                },
+            ]
+        };
+
+        let json = serde_json::to_string_pretty(&executors).unwrap();
+        let parsed: Executors = serde_json::from_str(json.as_ref()).unwrap();
+        assert_eq!(executors, parsed);
     }
 }
