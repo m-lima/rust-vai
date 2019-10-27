@@ -47,18 +47,28 @@ pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors, error::Erro
 pub fn load_from_stdin() -> Result<Executors, error::Error> {
     let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())
         .map_err(|e| error::new("executors::load_from_stdin", e))?;
-    Ok(Executors{executors})
+    Ok(Executors { executors })
 }
 
 impl Executor {
-    pub fn execute(query: String) {}
-    pub fn suggest(query: String) {}
+    pub fn execute(&self, query: String) -> Result<(), error::Error> {
+        Ok(())
+    }
+
+    pub fn suggest(&self, query: String) -> Result<(), error::Error> {
+        Ok(())
+    }
 }
 
 impl Executors {
-    pub fn list_targets(&self) {
-        for executor in &self.executors {
-            println!("{}", &executor.name);
+    pub fn list_targets(&self) -> Result<(), error::Error> {
+        if self.executors.len() < 1 {
+            Err(error::new("executors::list_targets", "No targets found"))
+        } else {
+            for executor in &self.executors {
+                println!("{}", &executor.name);
+            }
+            Ok(())
         }
     }
 
@@ -89,13 +99,16 @@ impl Executors {
         Ok(())
     }
 
-    pub fn find(&self, name: String) -> Option<&Executor> {
+    pub fn find(&self, name: String) -> Result<&Executor, error::Error> {
         for executor in &self.executors {
             if executor.name == name {
-                return Some(executor);
+                return Ok(executor);
             }
         }
-        None
+        Err(error::new(
+            "executors::find",
+            format!("target not found: {}", name),
+        ))
     }
 }
 
