@@ -2,7 +2,18 @@ mod error;
 mod executors;
 //mod support;
 
-fn support_mode() -> Result<(), error::Error> {
+fn extract_query(index: usize) -> Result<String, error::Error> {
+    if std::env::args().len() <= index {
+        Err(error::new("main::extract_query", "No query specified"))
+    } else {
+        Ok(std::env::args()
+            .skip(index)
+            .collect::<Vec<String>>()
+            .join(" "))
+    }
+}
+
+fn support() -> Result<(), error::Error> {
     match std::env::args().nth(2) {
         Some(arg) => match arg.as_str() {
             "r" => executors::load_from_stdin()?.save_default(),
@@ -11,20 +22,25 @@ fn support_mode() -> Result<(), error::Error> {
             "s" => match std::env::args().nth(3) {
                 Some(target) => executors::load_default()?
                     .find(target)?
-                    .suggest(std::env::args().skip(4).collect::<Vec<String>>().join(" ")),
-                None => Err(error::new("main::support_mode", "No target provided")),
+                    .suggest(extract_query(4)?),
+                None => Err(error::new("main::support", "No target provided")),
             },
             cmd => Err(error::new(
-                "main::support_mode",
+                "main::support",
                 format!("Command not recognized: {}", cmd),
             )),
         },
-        None => Err(error::new("main::support_mode", "No command given")),
+        None => Err(error::new("main::support", "No command given")),
     }
 }
 
-fn execute_mode() -> Result<(), error::Error> {
-    Ok(())
+fn execute() -> Result<(), error::Error> {
+    match std::env::args().nth(1) {
+        Some(target) => executors::load_default()?
+            .find(target)?
+            .execute(extract_query(2)?),
+        None => Err(error::new("main::execute", "Invalid target specified")),
+    }
 }
 
 fn main() {
@@ -32,9 +48,9 @@ fn main() {
         Some(arg) => "-" == arg,
         None => false,
     } {
-        support_mode()
+        support()
     } else {
-        execute_mode()
+        execute()
     } {
         eprintln!("{}", err);
     }

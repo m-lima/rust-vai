@@ -17,6 +17,14 @@ fn default_path() -> Result<std::path::PathBuf, &'static str> {
         })
 }
 
+fn clean_up_names(executor: Executor) -> Executor {
+    Executor {
+        name: executor.name.to_lowercase(),
+        command: executor.command,
+        suggestion: executor.suggestion,
+    }
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executor {
     name: String,
@@ -39,24 +47,59 @@ pub fn load_default() -> Result<Executors, error::Error> {
 
 pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors, error::Error> {
     let config = std::fs::read(&path).map_err(|e| error::new("executors::load::read", e))?;
-    let executors: Executors = bincode::deserialize(&config[..])
+    let executors: Vec<Executor> = bincode::deserialize(&config[..])
         .map_err(|e| error::new("executors::load::deserialize", e))?;
-    Ok(executors)
+    Ok(Executors { executors })
 }
 
 pub fn load_from_stdin() -> Result<Executors, error::Error> {
-    let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())
-        .map_err(|e| error::new("executors::load_from_stdin", e))?;
+    let executors: Vec<Executor> =
+        serde_json::from_reader::<std::io::Stdin, Vec<Executor>>(std::io::stdin())
+            .map_err(|e| error::new("executors::load_from_stdin", e))?
+            .into_iter()
+            .map(clean_up_names)
+            .collect();
     Ok(Executors { executors })
 }
 
 impl Executor {
     pub fn execute(&self, query: String) -> Result<(), error::Error> {
-        Ok(())
+        if "error" == query {
+            Err(error::new(
+                format!("executors::executor::{}::execute", self.name),
+                "Invalid query",
+            ))
+        } else {
+            self.save_history(query)
+        }
     }
 
     pub fn suggest(&self, query: String) -> Result<(), error::Error> {
-        Ok(())
+        if "error" == query {
+            Err(error::new(
+                format!("executors::executor::{}::suggest", self.name),
+                "Invalid query",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn save_history(&self, query: String) -> Result<(), error::Error> {
+        use std::io::Write;
+
+        std::fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(
+                default_path()
+                    .map_err(|e| error::new("executors::executor::save_history::default_path", e))?
+                    .join(format!("{}{}", HISTORY_PREFIX, self.name)),
+            )
+            .map_err(|e| error::new("executors::executor::save_history", e))?
+            .write_all(query.as_bytes())
+            .map_err(|e| error::new("executors::executor::save_history::write", e))
     }
 }
 
@@ -100,8 +143,9 @@ impl Executors {
     }
 
     pub fn find(&self, name: String) -> Result<&Executor, error::Error> {
+        let lower_case_name = name.to_lowercase();
         for executor in &self.executors {
-            if executor.name == name {
+            if executor.name == lower_case_name {
                 return Ok(executor);
             }
         }

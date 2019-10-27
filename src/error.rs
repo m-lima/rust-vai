@@ -3,9 +3,9 @@ pub struct Error {
     message: String,
 }
 
-pub fn new<E: std::string::ToString>(component: &str, err: E) -> Error {
+pub fn new<C: std::string::ToString, E: std::string::ToString>(component: C, err: E) -> Error {
     Error {
-        component: String::from(component),
+        component: component.to_string(),
         message: err.to_string(),
     }
 }
