@@ -53,5 +53,6 @@ fn main() {
         execute()
     } {
         eprintln!("{}", err);
+        std::process::exit(-1);
     }
 }

@@ -64,42 +64,61 @@ pub fn load_from_stdin() -> Result<Executors, error::Error> {
 
 impl Executor {
     pub fn execute(&self, query: String) -> Result<(), error::Error> {
-        if "error" == query {
-            Err(error::new(
-                format!("executors::executor::{}::execute", self.name),
-                "Invalid query",
-            ))
-        } else {
-            self.save_history(query)
+        match webbrowser::open(format!("{}{}", self.command, query).as_str()) {
+            Ok(_) => self.save_history(query),
+            Err(e) => Err(error::new("executors::executor::execute", e)),
         }
     }
 
     pub fn suggest(&self, query: String) -> Result<(), error::Error> {
-        if "error" == query {
-            Err(error::new(
-                format!("executors::executor::{}::suggest", self.name),
-                "Invalid query",
-            ))
-        } else {
-            Ok(())
+        if query.len() > 2 {
+            println!("Go");
         }
+
+        use std::io::BufRead;
+        std::io::BufReader::new(
+            std::fs::OpenOptions::new()
+                .write(false)
+                .read(true)
+                .open(
+                    default_path()
+                        .map_err(|e| error::new("executors::executor::suggest::default_path", e))?
+                        .join(format!("{}{}", HISTORY_PREFIX, self.name)),
+                )
+                .map_err(|e| error::new("executors::executor::suggest::open", e))?,
+        )
+        .lines()
+        .filter(|line| match line {
+            Ok(line) => line.starts_with(&query),
+            Err(_) => false,
+        })
+        .for_each(|line| match line {
+            Ok(line) => println!("{}", line),
+            Err(_) => (),
+        });
+        Ok(())
+    }
+
+    fn load_history(&self) -> Result<String, error::Error> {
+        std::fs::read_to_string(
+            default_path()
+                .map_err(|e| error::new("executors::executor::load_history::default_path", e))?
+                .join(format!("{}{}", HISTORY_PREFIX, self.name)),
+        )
+        .map_err(|e| error::new("executors::executor::load_history::read_to_string", e))
     }
 
     fn save_history(&self, query: String) -> Result<(), error::Error> {
-        use std::io::Write;
-
-        std::fs::OpenOptions::new()
-            .write(true)
-            .append(true)
-            .create(true)
-            .open(
-                default_path()
-                    .map_err(|e| error::new("executors::executor::save_history::default_path", e))?
-                    .join(format!("{}{}", HISTORY_PREFIX, self.name)),
-            )
-            .map_err(|e| error::new("executors::executor::save_history", e))?
-            .write_all(query.as_bytes())
-            .map_err(|e| error::new("executors::executor::save_history::write", e))
+        std::fs::write(
+            default_path()
+                .map_err(|e| error::new("executors::executor::save_history::default_path", e))?
+                .join(format!("{}{}", HISTORY_PREFIX, self.name)),
+            match self.load_history() {
+                Ok(history) => format!("{}\n{}", query, history),
+                Err(_) => query + "\n",
+            },
+        )
+        .map_err(|e| error::new("executors::executor::save_history::write", e))
     }
 }
 
@@ -153,33 +172,5 @@ impl Executors {
             "executors::find",
             format!("target not found: {}", name),
         ))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    //    #[should_panic(expected = "No such file or directory (os error 2)")]
-    fn test_json_roundtrip() {
-        let executors = Executors {
-            executors: vec![
-                Executor {
-                    name: "na".to_owned(),
-                    command: "ca".to_owned(),
-                    suggestion: "sa".to_owned(),
-                },
-                Executor {
-                    name: "nb".to_owned(),
-                    command: "cb".to_owned(),
-                    suggestion: "sb".to_owned(),
-                },
-            ],
-        };
-
-        let json = serde_json::to_string_pretty(&executors).unwrap();
-        let parsed: Executors = serde_json::from_str(json.as_ref()).unwrap();
-        assert_eq!(executors, parsed);
     }
 }

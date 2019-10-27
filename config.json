@@ -1,0 +1,27 @@
+[
+  {
+    "name": "start",
+    "command": "https://www.startpage.com/sp/search?t=blak&lui=english&language=english&cat=web&query=",
+    "suggestion": ""
+  },
+  {
+    "name": "google",
+    "command": "https://www.google.com/search?q=",
+    "suggestion": ""
+  },
+  {
+    "name": "duck",
+    "command": "https://duckduckgo.com/?q=",
+    "suggestion": ""
+  },
+  {
+    "name": "youtube",
+    "command": "http://youtube.com/results?search_query=",
+    "suggestion": ""
+  },
+  {
+    "name": "image",
+    "command": "https://www.google.com/search?tbm=isch&q=",
+    "suggestion": ""
+  }
+]
