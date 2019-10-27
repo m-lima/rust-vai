@@ -8,7 +8,7 @@
   {
     "name": "google",
     "command": "https://www.google.com/search?q=",
-    "suggestion": "http://suggestqueries.google.com/complete/search?output=firefox&q=",
+    "suggestion": "https://suggestqueries.google.com/complete/search?output=firefox&q=",
     "completer": "GOOGLE"
   },
   {
@@ -19,14 +19,14 @@
   },
   {
     "name": "youtube",
-    "command": "http://youtube.com/results?search_query=",
+    "command": "https://youtube.com/results?search_query=",
     "suggestion": "",
     "completer": ""
   },
   {
     "name": "image",
     "command": "https://www.google.com/search?tbm=isch&q=",
-    "suggestion": "http://suggestqueries.google.com/complete/search?output=firefox&q=",
+    "suggestion": "https://suggestqueries.google.com/complete/search?output=firefox&q=",
     "completer": "GOOGLE"
   }
 ]
