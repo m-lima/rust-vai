@@ -11,7 +11,7 @@ pub fn new<C: std::string::ToString, E: std::string::ToString>(component: C, err
 }
 
 impl std::fmt::Display for Error {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "[{}] {}", &self.component, &self.message)
     }
 }

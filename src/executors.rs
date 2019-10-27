@@ -1,8 +1,6 @@
-extern crate bincode;
-extern crate dirs;
-extern crate serde_json;
-
+use super::completer;
 use super::error;
+
 use serde::{Deserialize, Serialize};
 
 const HISTORY_PREFIX: &'static str = "history_";
@@ -22,6 +20,7 @@ fn clean_up_names(executor: Executor) -> Executor {
         name: executor.name.to_lowercase(),
         command: executor.command,
         suggestion: executor.suggestion,
+        completer: executor.completer,
     }
 }
 
@@ -30,6 +29,7 @@ pub struct Executor {
     name: String,
     command: String,
     suggestion: String,
+    completer: String,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -71,9 +71,9 @@ impl Executor {
     }
 
     pub fn suggest(&self, query: String) -> Result<(), error::Error> {
-        if query.len() > 2 {
-            println!("Go");
-        }
+        completer::complete(&query, &self.suggestion, &self.completer)?;
+
+        println!("--");
 
         use std::io::BufRead;
         std::io::BufReader::new(

@@ -2,26 +2,31 @@
   {
     "name": "start",
     "command": "https://www.startpage.com/sp/search?t=blak&lui=english&language=english&cat=web&query=",
-    "suggestion": ""
+    "suggestion": "https://www.startpage.com/do/suggest?limit=10&format=json&query=",
+    "completer": "GOOGLE"
   },
   {
     "name": "google",
     "command": "https://www.google.com/search?q=",
-    "suggestion": ""
+    "suggestion": "http://suggestqueries.google.com/complete/search?output=firefox&q=",
+    "completer": "GOOGLE"
   },
   {
     "name": "duck",
     "command": "https://duckduckgo.com/?q=",
-    "suggestion": ""
+    "suggestion": "https://duckduckgo.com/ac/?q=",
+    "completer": "DUCK"
   },
   {
     "name": "youtube",
     "command": "http://youtube.com/results?search_query=",
-    "suggestion": ""
+    "suggestion": "",
+    "completer": ""
   },
   {
     "name": "image",
     "command": "https://www.google.com/search?tbm=isch&q=",
-    "suggestion": ""
+    "suggestion": "http://suggestqueries.google.com/complete/search?output=firefox&q=",
+    "completer": "GOOGLE"
   }
 ]

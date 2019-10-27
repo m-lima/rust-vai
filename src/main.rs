@@ -1,3 +1,7 @@
+#![deny(warnings)]
+#![warn(rust_2018_idioms)]
+
+mod completer;
 mod error;
 mod executors;
 //mod support;
