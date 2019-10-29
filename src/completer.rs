@@ -14,6 +14,15 @@ impl std::fmt::Display for FetchError {
     }
 }
 
+#[derive(Debug, Clone)]
+struct UnkownParser(String);
+impl std::error::Error for UnkownParser {}
+impl std::fmt::Display for UnkownParser {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        write!(fmt, "Unknown parser: {}", self.0)
+    }
+}
+
 mod google {
     use serde::{Deserialize, Serialize};
 
@@ -47,20 +56,16 @@ pub fn _complete(query: &String, url: &String, parser_name: &String) -> Result<V
         let response = ureq::get(format!("{}{}", url, query).as_str()).call();
 
         if !response.ok() {
-            return Ok(vec![]);
+            return Err(FetchError(response.status()).into());
         }
 
-        response.into_string().map(Some).unwrap_or(None)
+        response.into_string()?
     };
 
-    if let Some(result) = result {
-        match parser_name.as_str() {
-            "GOOGLE" => _parse_google(&result),
-            "DUCK" => _parse_duck(&result),
-            _ => Ok(vec![]),
-        }
-    } else {
-        Ok(vec![])
+    match parser_name.as_str() {
+        "GOOGLE" => _parse_google(&result),
+        "DUCK" => _parse_duck(&result),
+        parser => Err(UnkownParser(String::from(parser)).into()),
     }
 }
 

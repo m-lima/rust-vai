@@ -14,15 +14,6 @@ impl std::fmt::Display for PathError {
     }
 }
 
-fn default_path() -> Result<std::path::PathBuf> {
-    std::env::var("VAI_CONFIG")
-        .map(|var| std::path::PathBuf::from(var))
-        .or_else(|_| match dirs::config_dir() {
-            Some(path) => Ok(path.join("vai")),
-            None => Err(PathError.into()),
-        })
-}
-
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executor {
     name: String,
@@ -38,6 +29,15 @@ pub fn load_default() -> Result<Executors> {
     default_path()
         .map(|path| path.join(CONFIG_FILE))
         .and_then(load)
+}
+
+fn default_path() -> Result<std::path::PathBuf> {
+    std::env::var("VAI_CONFIG")
+        .map(|var| std::path::PathBuf::from(var))
+        .or_else(|_| match dirs::config_dir() {
+            Some(path) => Ok(path.join("vai")),
+            None => Err(PathError.into()),
+        })
 }
 
 pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
@@ -95,10 +95,12 @@ impl Executor {
             .open(path)
             .map(std::io::BufReader::new)
             .map(std::io::BufReader::lines)
-            .map(|lines| lines
-                .filter_map(std::result::Result::ok)
-                .filter(|line| line.starts_with(query))
-                .collect())
+            .map(|lines| {
+                lines
+                    .filter_map(std::result::Result::ok)
+                    .filter(|line| line.starts_with(query))
+                    .collect()
+            })
             .or(Ok(vec![]))
     }
 }
