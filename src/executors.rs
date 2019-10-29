@@ -89,17 +89,17 @@ impl Executor {
         use std::io::BufRead;
         let path =
             default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
-        let lines = std::fs::OpenOptions::new()
+        std::fs::OpenOptions::new()
             .write(false)
             .read(true)
             .open(path)
             .map(std::io::BufReader::new)
-            .map(std::io::BufReader::lines)?
-            .filter_map(std::result::Result::ok)
-            .filter(|line| line.starts_with(query))
-            .collect();
-
-        Ok(lines)
+            .map(std::io::BufReader::lines)
+            .map(|lines| lines
+                .filter_map(std::result::Result::ok)
+                .filter(|line| line.starts_with(query))
+                .collect())
+            .or(Ok(vec![]))
     }
 }
 
