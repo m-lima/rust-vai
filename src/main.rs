@@ -1,9 +1,9 @@
 #![deny(warnings)]
 #![warn(rust_2018_idioms)]
 
-mod completer;
 mod executors;
 mod parser;
+mod suggester;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -71,16 +71,18 @@ fn support(args: Vec<String>) -> Result {
                 if args.len() < 3 {
                     new_error(VaiErrorType::NoTarget)
                 } else {
+                    use suggester::Suggestor;
                     let executors = executors::load_default()?;
                     let target = executors
                         .find(&args[2])
                         .ok_or(VaiError(VaiErrorType::UnknownTarget))?;
                     let query = &extract_query(args, 3)?;
-                    completer::complete(query, target)?
+                    target
+                        .suggest(&query)?
                         .into_iter()
                         .for_each(|entry| println!("{}", entry));
                     target
-                        .suggest(query)?
+                        .complete(&query)?
                         .into_iter()
                         .for_each(|entry| println!("{}", entry));
                     Ok(())

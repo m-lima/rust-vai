@@ -85,7 +85,7 @@ impl Executor {
         self.save_history(query)
     }
 
-    pub fn suggest(&self, query: &String) -> Result<Vec<String>> {
+    pub fn complete(&self, query: &String) -> Result<Vec<String>> {
         use std::io::BufRead;
         let path =
             default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;

@@ -39,28 +39,34 @@ fn parse_duck(result: String) -> Result<Vec<String>> {
     Ok(vec![result])
 }
 
-pub fn complete(query: &String, target: &super::executors::Executor) -> Result<Vec<String>> {
-    if query.len() < 3
-        || target.suggestion.is_empty()
-        || target.completer == super::parser::Parser::NONE
-    {
-        return Ok(vec![]);
-    }
+pub trait Suggestor {
+    fn suggest(&self, query: &String) -> Result<Vec<String>>;
+}
 
-    let result = {
-        let response = ureq::get(format!("{}{}", target.suggestion, query).as_str()).call();
-
-        if !response.ok() {
-            return Err(FetchError(response.status()).into());
+impl Suggestor for super::executors::Executor {
+    fn suggest(&self, query: &String) -> Result<Vec<String>> {
+        if query.len() < 3
+            || self.suggestion.is_empty()
+            || self.completer == super::parser::Parser::NONE
+        {
+            return Ok(vec![]);
         }
 
-        response.into_string()?
-    };
+        let result = {
+            let response = ureq::get(format!("{}{}", self.suggestion, query).as_str()).call();
 
-    match &target.completer {
-        super::parser::Parser::GOOGLE => parse_google(result),
-        super::parser::Parser::DUCK => parse_duck(result),
-        super::parser::Parser::NONE => Ok(vec![]),
+            if !response.ok() {
+                return Err(FetchError(response.status()).into());
+            }
+
+            response.into_string()?
+        };
+
+        match &self.completer {
+            super::parser::Parser::GOOGLE => parse_google(result),
+            super::parser::Parser::DUCK => parse_duck(result),
+            super::parser::Parser::NONE => Ok(vec![]),
+        }
     }
 }
 
