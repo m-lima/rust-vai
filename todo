@@ -1,0 +1,8 @@
+[ ]! Implement parsers (raw deserializers?) for suggestions
+[ ]  List suggestions parsers
+[ ]  Re-think error handling
+[ ]  Make it a library
+[ ]  - Make CLI front-end
+[ ]    - Make ZSH completions
+[ ]  - Make GUI front-end
+[ ]? Make it a daemon

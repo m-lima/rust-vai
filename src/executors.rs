@@ -1,27 +1,28 @@
 use super::completer;
-use super::error;
 
 use serde::{Deserialize, Serialize};
 
 const HISTORY_PREFIX: &'static str = "history_";
 const CONFIG_FILE: &'static str = "config";
 
-fn default_path() -> Result<std::path::PathBuf, &'static str> {
+type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+#[derive(Debug, Clone)]
+struct PathError;
+impl std::error::Error for PathError {}
+impl std::fmt::Display for PathError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        write!(fmt, "Could not infer HOME directory")
+    }
+}
+
+fn default_path() -> Result<std::path::PathBuf> {
     std::env::var("VAI_CONFIG")
         .map(|var| std::path::PathBuf::from(var))
         .or_else(|_| match dirs::config_dir() {
             Some(path) => Ok(path.join("vai")),
-            None => Err("Could not infer HOME directory"),
+            None => Err(PathError.into()),
         })
-}
-
-fn clean_up_names(executor: Executor) -> Executor {
-    Executor {
-        name: executor.name.to_lowercase(),
-        command: executor.command,
-        suggestion: executor.suggestion,
-        completer: executor.completer,
-    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -33,144 +34,111 @@ pub struct Executor {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Executors {
-    executors: Vec<Executor>,
+pub struct Executors(Vec<Executor>);
+
+pub fn load_default() -> Result<Executors> {
+    default_path()
+        .map(|path| path.join(CONFIG_FILE))
+        .and_then(load)
 }
 
-pub fn load_default() -> Result<Executors, error::Error> {
-    load(
-        default_path()
-            .map_err(|e| error::new("executors::load_default::default_path", e))?
-            .join(CONFIG_FILE),
-    )
+pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
+    bincode::deserialize(std::fs::read(&path)?.as_slice())
+        .map(Executors)
+        .map_err(std::convert::Into::into)
 }
 
-pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors, error::Error> {
-    let config = std::fs::read(&path).map_err(|e| error::new("executors::load::read", e))?;
-    let executors: Vec<Executor> = bincode::deserialize(&config[..])
-        .map_err(|e| error::new("executors::load::deserialize", e))?;
-    Ok(Executors { executors })
-}
-
-pub fn load_from_stdin() -> Result<Executors, error::Error> {
-    let executors: Vec<Executor> =
-        serde_json::from_reader::<std::io::Stdin, Vec<Executor>>(std::io::stdin())
-            .map_err(|e| error::new("executors::load_from_stdin", e))?
-            .into_iter()
-            .map(clean_up_names)
-            .collect();
-    Ok(Executors { executors })
+pub fn load_from_stdin() -> Result<Executors> {
+    let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())?;
+    Ok(Executors(
+        executors.into_iter().map(Executor::clean_up_name).collect(),
+    ))
 }
 
 impl Executor {
-    pub fn execute(&self, query: String) -> Result<(), error::Error> {
-        match webbrowser::open(format!("{}{}", self.command, query).as_str()) {
-            Ok(_) => self.save_history(query),
-            Err(e) => Err(error::new("executors::executor::execute", e)),
+    fn clean_up_name(self) -> Executor {
+        Executor {
+            name: self.name.to_lowercase(),
+            command: self.command,
+            suggestion: self.suggestion,
+            completer: self.completer,
         }
     }
 
-    pub fn suggest(&self, query: String) -> Result<(), error::Error> {
-        completer::complete(&query, &self.suggestion, &self.completer)?;
+    pub fn execute(&self, query: String) -> Result {
+        let url = format!("{}{}", &self.command, query);
+        webbrowser::open(url.as_str())?;
+        self.save_history(query)
+    }
 
-        println!("--");
+    pub fn suggest(&self, query: String) -> Result<(Vec<String>, Vec<String>)> {
+        let suggestion = completer::complete(&query, &self.suggestion, &self.completer);
 
         use std::io::BufRead;
-        std::io::BufReader::new(
-            std::fs::OpenOptions::new()
-                .write(false)
-                .read(true)
-                .open(
-                    default_path()
-                        .map_err(|e| error::new("executors::executor::suggest::default_path", e))?
-                        .join(format!("{}{}", HISTORY_PREFIX, self.name)),
-                )
-                .map_err(|e| error::new("executors::executor::suggest::open", e))?,
-        )
-        .lines()
-        .filter(|line| match line {
-            Ok(line) => line.starts_with(&query),
-            Err(_) => false,
-        })
-        .for_each(|line| match line {
-            Ok(line) => println!("{}", line),
-            Err(_) => (),
-        });
-        Ok(())
+        let path =
+            default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
+        let lines = std::fs::OpenOptions::new()
+            .write(false)
+            .read(true)
+            .open(path)
+            .map(std::io::BufReader::new)
+            .map(std::io::BufReader::lines)?;
+
+        let history: Vec<String> = lines
+            .filter_map(std::result::Result::ok)
+            .filter(|line| line.starts_with(&query))
+            .collect();
+
+        Ok((suggestion, history))
     }
 
-    fn load_history(&self) -> Result<String, error::Error> {
-        std::fs::read_to_string(
-            default_path()
-                .map_err(|e| error::new("executors::executor::load_history::default_path", e))?
-                .join(format!("{}{}", HISTORY_PREFIX, self.name)),
-        )
-        .map_err(|e| error::new("executors::executor::load_history::read_to_string", e))
-    }
-
-    fn save_history(&self, query: String) -> Result<(), error::Error> {
-        std::fs::write(
-            default_path()
-                .map_err(|e| error::new("executors::executor::save_history::default_path", e))?
-                .join(format!("{}{}", HISTORY_PREFIX, self.name)),
-            match self.load_history() {
-                Ok(history) => format!("{}\n{}", query, history),
-                Err(_) => query + "\n",
-            },
-        )
-        .map_err(|e| error::new("executors::executor::save_history::write", e))
+    fn save_history(&self, query: String) -> Result {
+        let path =
+            default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
+        let history = std::fs::read_to_string(&path).unwrap_or(String::new());
+        let data = format!("{}\n{}", query, history);
+        std::fs::write(&path, data).map_err(std::convert::Into::into)
     }
 }
 
 impl Executors {
-    pub fn list_targets(&self) -> Result<(), error::Error> {
-        if self.executors.len() < 1 {
-            Err(error::new("executors::list_targets", "No targets found"))
-        } else {
-            for executor in &self.executors {
-                println!("{}", &executor.name);
-            }
-            Ok(())
-        }
+    #[inline(always)]
+    fn executors(&self) -> &Vec<Executor> {
+        &self.0
     }
 
-    pub fn save_default(&self) -> Result<(), error::Error> {
-        self.save(
-            default_path()
-                .map_err(|e| error::new("executors::save_default::default_path", e))?
-                .join(CONFIG_FILE),
-        )
+    pub fn list_targets(&self) -> Vec<&String> {
+        self.executors()
+            .iter()
+            .map(|executor| &executor.name)
+            .collect()
     }
 
-    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), error::Error> {
-        let bytes = bincode::serialize(&self.executors)
-            .map_err(|e| error::new("executors::save::serialize", e))?;
+    pub fn save_default(&self) -> Result {
+        default_path()
+            .map(|path| path.join(CONFIG_FILE))
+            .and_then(|path| self.save(path))
+    }
+
+    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result {
         if let Some(parent) = path.as_ref().parent() {
-            std::fs::create_dir_all(&parent)
-                .map_err(|e| error::new("executors::save::create_dir_all", e))?;
+            std::fs::create_dir_all(&parent)?;
         }
-        std::fs::write(&path, bytes).map_err(|e| error::new("executors::save::write", e))
+        let bytes = bincode::serialize(self.executors())?;
+        std::fs::write(&path, bytes).map_err(std::convert::Into::into)
     }
 
-    pub fn to_json(&self) -> Result<(), error::Error> {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&self.executors)
-                .map_err(|e| error::new("executors::to_json", e))?
-        );
-        Ok(())
+    pub fn to_json(&self) -> Result<String> {
+        serde_json::to_string_pretty(&self).map_err(std::convert::Into::into)
     }
 
-    pub fn find(&self, name: String) -> Result<&Executor, error::Error> {
+    pub fn find(&self, name: String) -> Option<&Executor> {
         let lower_case_name = name.to_lowercase();
-        for executor in &self.executors {
+        for executor in self.executors() {
             if executor.name == lower_case_name {
-                return Ok(executor);
+                return Some(executor);
             }
         }
-        Err(error::new(
-            "executors::find",
-            format!("target not found: {}", name),
-        ))
+        None
     }
 }

@@ -1,4 +1,7 @@
-use super::error;
+pub enum Parser {
+    GOOGLE,
+    DUCK,
+}
 
 mod google {
     use serde::{Deserialize, Serialize};
@@ -13,35 +16,41 @@ mod google {
     pub struct Json(pub Vec<Item>);
 }
 
-fn parse_google(result: &String) {
-    serde_json::from_str::<google::Json>(result.as_str())
-        .map(|parsed| println!("{:#?}", parsed.0.first().unwrap()))
-        .unwrap_or(());
+fn parse_google(_result: &String) -> Vec<String> {
+    //    serde_json::from_str::<google::Json>(result.as_str())
+    //        .map(|parsed| println!("{:#?}", parsed.0.first().unwrap()))
+    //        .unwrap_or(());
+    vec![]
 }
 
-fn parse_duck(_result: &String) {}
+fn parse_duck(_result: &String) -> Vec<String> {
+    vec![]
+}
 
-pub fn complete(query: &String, url: &String, parser_name: &String) -> Result<(), error::Error> {
+pub fn complete(query: &String, url: &String, parser_name: &String) -> Vec<String> {
     if query.len() < 3 || url.is_empty() || parser_name.is_empty() {
-        return Err(error::new("completer::complete", "Nothing to parse"));
+        return vec![];
     }
 
     let result = {
         let response = ureq::get(format!("{}{}", url, query).as_str()).call();
 
-        if response.ok() {
-            response.into_string().unwrap_or(String::new())
-        } else {
-            String::new()
+        if !response.ok() {
+            return vec![];
         }
+
+        response.into_string().map(Some).unwrap_or(None)
     };
 
-    match parser_name.as_str() {
-        "GOOGLE" => parse_google(&result),
-        "DUCK" => parse_duck(&result),
-        _ => (),
-    };
-    Ok(())
+    if let Some(result) = result {
+        match parser_name.as_str() {
+            "GOOGLE" => parse_google(&result),
+            "DUCK" => parse_duck(&result),
+            _ => vec![],
+        }
+    } else {
+        vec![]
+    }
 }
 
 #[cfg(test)]
