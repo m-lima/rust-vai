@@ -71,12 +71,19 @@ fn support(args: Vec<String>) -> Result {
                 if args.len() < 3 {
                     new_error(VaiErrorType::NoTarget)
                 } else {
-                    Ok(executors::load_default()?
+                    let executors = executors::load_default()?;
+                    let target = executors
                         .find(&args[2])
-                        .ok_or(VaiError(VaiErrorType::UnknownTarget))?
-                        .suggest(&extract_query(args, 3)?)?
+                        .ok_or(VaiError(VaiErrorType::UnknownTarget))?;
+                    let query = &extract_query(args, 3)?;
+                    completer::complete(query, target)?
                         .into_iter()
-                        .for_each(|target| println!("{}", target)))
+                        .for_each(|entry| println!("{}", entry));
+                    target
+                        .suggest(query)?
+                        .into_iter()
+                        .for_each(|entry| println!("{}", entry));
+                    Ok(())
                 }
             }
             _ => new_error(VaiErrorType::UnknownCommand),

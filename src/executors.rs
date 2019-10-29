@@ -18,8 +18,8 @@ impl std::fmt::Display for PathError {
 pub struct Executor {
     name: String,
     command: String,
-    suggestion: String,
-    completer: super::parser::Parser,
+    pub suggestion: String,
+    pub completer: super::parser::Parser,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

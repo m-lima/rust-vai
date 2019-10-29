@@ -31,24 +31,24 @@ mod google {
     pub struct Json(pub Vec<Item>);
 }
 
-fn _parse_google(_result: &String) -> Result<Vec<String>> {
-    //    serde_json::from_str::<google::Json>(result.as_str())
-    //        .map(|parsed| println!("{:#?}", parsed.0.first().unwrap()))
-    //        .unwrap_or(());
-    Ok(vec![])
+fn parse_google(result: String) -> Result<Vec<String>> {
+    Ok(vec![result])
 }
 
-fn _parse_duck(_result: &String) -> Result<Vec<String>> {
-    Ok(vec![])
+fn parse_duck(result: String) -> Result<Vec<String>> {
+    Ok(vec![result])
 }
 
-pub fn _complete(query: &String, url: &String, parser_name: &String) -> Result<Vec<String>> {
-    if query.len() < 3 || url.is_empty() || parser_name.is_empty() {
+pub fn complete(query: &String, target: &super::executors::Executor) -> Result<Vec<String>> {
+    if query.len() < 3
+        || target.suggestion.is_empty()
+        || target.completer == super::parser::Parser::NONE
+    {
         return Ok(vec![]);
     }
 
     let result = {
-        let response = ureq::get(format!("{}{}", url, query).as_str()).call();
+        let response = ureq::get(format!("{}{}", target.suggestion, query).as_str()).call();
 
         if !response.ok() {
             return Err(FetchError(response.status()).into());
@@ -57,10 +57,10 @@ pub fn _complete(query: &String, url: &String, parser_name: &String) -> Result<V
         response.into_string()?
     };
 
-    match parser_name.as_str() {
-        "GOOGLE" => _parse_google(&result),
-        "DUCK" => _parse_duck(&result),
-        parser => Err(UnkownParser(String::from(parser)).into()),
+    match &target.completer {
+        super::parser::Parser::GOOGLE => parse_google(result),
+        super::parser::Parser::DUCK => parse_duck(result),
+        super::parser::Parser::NONE => Ok(vec![]),
     }
 }
 
@@ -71,12 +71,12 @@ mod tests {
     #[test]
     fn test_google_parsing() {
         let response =  String::from(r#"["bla",["bladet","blake shelton","black","black panther","blake lively","black mirror","blank","bladkongen","blade runner","blacklist"]]"#);
-        let _ = _parse_google(&response);
+        let _ = parse_google(response);
     }
 
     #[test]
     fn test_duck_parsing() {
         let response =  String::from(r#"[{"phrase":"gopher football"},{"phrase":"gopher"},{"phrase":"gophersports.com"},{"phrase":"gopher football schedule"},{"phrase":"gopher sports"},{"phrase":"gopher 5 winning numbers"},{"phrase":"gopher football score"},{"phrase":"gopher snake"},{"phrase":"gopher hockey"},{"phrase":"gopher volleyball"}]"#);
-        let _ = _parse_duck(&response);
+        let _ = parse_duck(response);
     }
 }
