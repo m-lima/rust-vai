@@ -3,6 +3,7 @@
 
 mod completer;
 mod executors;
+mod parser;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 

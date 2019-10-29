@@ -19,7 +19,7 @@ pub struct Executor {
     name: String,
     command: String,
     suggestion: String,
-    completer: String,
+    completer: super::parser::Parser,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

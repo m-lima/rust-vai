@@ -1,10 +1,5 @@
 use super::Result;
 
-//pub enum Parser {
-//    GOOGLE,
-//    DUCK,
-//}
-
 #[derive(Debug, Clone)]
 struct FetchError(u16);
 impl std::error::Error for FetchError {}

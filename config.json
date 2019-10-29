@@ -21,7 +21,7 @@
     "name": "youtube",
     "command": "https://youtube.com/results?search_query=",
     "suggestion": "",
-    "completer": ""
+    "completer": "NONE"
   },
   {
     "name": "image",
