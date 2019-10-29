@@ -1,11 +1,9 @@
-use super::completer;
+use super::Result;
 
 use serde::{Deserialize, Serialize};
 
 const HISTORY_PREFIX: &'static str = "history_";
 const CONFIG_FILE: &'static str = "config";
-
-type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Debug, Clone)]
 struct PathError;
@@ -65,15 +63,29 @@ impl Executor {
         }
     }
 
-    pub fn execute(&self, query: String) -> Result {
+    fn save_history(&self, query: &String) -> Result {
+        let path =
+            default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
+        let history = std::fs::read_to_string(&path)
+            .map(|string| {
+                string
+                    .lines()
+                    .filter(|line| line != query)
+                    .collect::<Vec<&str>>()
+                    .join("\n")
+            })
+            .unwrap_or(String::new());
+        let data = format!("{}\n{}\n", query, history);
+        std::fs::write(&path, data).map_err(std::convert::Into::into)
+    }
+
+    pub fn execute(&self, query: &String) -> Result {
         let url = format!("{}{}", &self.command, query);
         webbrowser::open(url.as_str())?;
         self.save_history(query)
     }
 
-    pub fn suggest(&self, query: String) -> Result<(Vec<String>, Vec<String>)> {
-        let suggestion = completer::complete(&query, &self.suggestion, &self.completer);
-
+    pub fn suggest(&self, query: &String) -> Result<Vec<String>> {
         use std::io::BufRead;
         let path =
             default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
@@ -82,22 +94,12 @@ impl Executor {
             .read(true)
             .open(path)
             .map(std::io::BufReader::new)
-            .map(std::io::BufReader::lines)?;
-
-        let history: Vec<String> = lines
+            .map(std::io::BufReader::lines)?
             .filter_map(std::result::Result::ok)
-            .filter(|line| line.starts_with(&query))
+            .filter(|line| line.starts_with(query))
             .collect();
 
-        Ok((suggestion, history))
-    }
-
-    fn save_history(&self, query: String) -> Result {
-        let path =
-            default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
-        let history = std::fs::read_to_string(&path).unwrap_or(String::new());
-        let data = format!("{}\n{}", query, history);
-        std::fs::write(&path, data).map_err(std::convert::Into::into)
+        Ok(lines)
     }
 }
 
@@ -132,7 +134,7 @@ impl Executors {
         serde_json::to_string_pretty(&self).map_err(std::convert::Into::into)
     }
 
-    pub fn find(&self, name: String) -> Option<&Executor> {
+    pub fn find(&self, name: &String) -> Option<&Executor> {
         let lower_case_name = name.to_lowercase();
         for executor in self.executors() {
             if executor.name == lower_case_name {
