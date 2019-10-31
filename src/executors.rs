@@ -1,3 +1,4 @@
+use super::parser;
 use super::Result;
 
 use serde::{Deserialize, Serialize};
@@ -14,12 +15,21 @@ impl std::fmt::Display for PathError {
     }
 }
 
+#[derive(Debug, Clone)]
+struct FetchError(u16);
+impl std::error::Error for FetchError {}
+impl std::fmt::Display for FetchError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        write!(fmt, "Got status code {} from suggest query", self.0)
+    }
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executor {
     name: String,
     command: String,
-    pub suggestion: String,
-    pub completer: super::parser::Parser,
+    suggestion: String,
+    parser: parser::Parser,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -59,7 +69,7 @@ impl Executor {
             name: self.name.to_lowercase(),
             command: self.command,
             suggestion: self.suggestion,
-            completer: self.completer,
+            parser: self.parser,
         }
     }
 
@@ -102,6 +112,24 @@ impl Executor {
                     .collect()
             })
             .or(Ok(vec![]))
+    }
+
+    pub fn suggest(&self, query: &String) -> Result<Vec<String>> {
+        if query.len() < 3 || self.suggestion.is_empty() || self.parser == parser::Parser::NONE {
+            return Ok(vec![]);
+        }
+
+        let result = {
+            let response = ureq::get(format!("{}{}", self.suggestion, query).as_str()).call();
+
+            if !response.ok() {
+                return Err(FetchError(response.status()).into());
+            }
+
+            response.into_string()?
+        };
+
+        parser::parse(&self.parser, result)
     }
 }
 

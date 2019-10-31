@@ -3,7 +3,6 @@
 
 mod executors;
 mod parser;
-mod suggester;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -71,7 +70,6 @@ fn support(args: Vec<String>) -> Result {
                 if args.len() < 3 {
                     new_error(VaiErrorType::NoTarget)
                 } else {
-                    use suggester::Suggestor;
                     let executors = executors::load_default()?;
                     let target = executors
                         .find(&args[2])

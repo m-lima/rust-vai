@@ -3,30 +3,30 @@
     "name": "start",
     "command": "https://www.startpage.com/sp/search?t=blak&lui=english&language=english&cat=web&query=",
     "suggestion": "https://www.startpage.com/do/suggest?limit=10&format=json&query=",
-    "completer": "GOOGLE"
+    "parser": "GOOGLE"
   },
   {
     "name": "google",
     "command": "https://www.google.com/search?q=",
     "suggestion": "https://suggestqueries.google.com/complete/search?output=firefox&q=",
-    "completer": "GOOGLE"
+    "parser": "GOOGLE"
   },
   {
     "name": "duck",
     "command": "https://duckduckgo.com/?q=",
     "suggestion": "https://duckduckgo.com/ac/?q=",
-    "completer": "DUCK"
+    "parser": "DUCK"
   },
   {
     "name": "youtube",
     "command": "https://youtube.com/results?search_query=",
     "suggestion": "",
-    "completer": "NONE"
+    "parser": "NONE"
   },
   {
     "name": "image",
     "command": "https://www.google.com/search?tbm=isch&q=",
     "suggestion": "https://suggestqueries.google.com/complete/search?output=firefox&q=",
-    "completer": "GOOGLE"
+    "parser": "GOOGLE"
   }
 ]
