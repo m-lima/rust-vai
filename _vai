@@ -1,0 +1,34 @@
+#compdef vai
+
+# Reload by: unfunction _vai && autoload -U _vai
+
+command -v vai &> /dev/null || return
+
+local completions=()
+
+if (( CURRENT == 2 ))
+then
+  completions+=(`vai -t`)
+  _describe 'targets' completions
+
+  local options=(
+  '-w:Write configuration as JSON'
+  '-r:Load configuration from JSON'
+  '-t:Print known targets'
+  '-s:Show suggestions'
+  )
+  _describe 'support' options
+else
+  local arg="${words[2]}"
+
+  if [[ "${arg[1]}" == "-" ]]
+  then
+    case "${arg}" in
+      "-s") (( CURRENT == 3 )) && completions=(`vai -t`) && _describe 'targets' completions ;;
+    esac
+  else
+    completions=(${(f)"$(vai -s ${arg} ${words:2})"})
+    words="${words[0]} ${words[1]} bla ble bli"
+    _describe 'suggestions' completions
+  fi
+fi

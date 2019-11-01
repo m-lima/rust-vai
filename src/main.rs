@@ -9,9 +9,9 @@ type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[derive(Debug, Clone)]
 enum VaiErrorType {
     NoArguments,
+    EmptyArgument,
     NoQuery,
     NoTarget,
-    NoCommand,
     UnknownTarget,
     UnknownCommand,
 }
@@ -26,9 +26,9 @@ impl std::fmt::Display for VaiError {
             "{}",
             match self.0 {
                 VaiErrorType::NoArguments => "No arguments specified",
+                VaiErrorType::EmptyArgument => "Empty argument specified",
                 VaiErrorType::NoQuery => "No query specified",
                 VaiErrorType::NoTarget => "No target specified",
-                VaiErrorType::NoCommand => "No command specified",
                 VaiErrorType::UnknownTarget => "Unrecognized target",
                 VaiErrorType::UnknownCommand => "Unrecognized command",
             }
@@ -54,40 +54,42 @@ fn extract_query(args: Vec<String>, index: usize) -> Result<String> {
 }
 
 fn support(args: Vec<String>) -> Result {
-    if args.len() < 2 {
-        new_error(VaiErrorType::NoCommand)
-    } else {
-        match args[1].as_str() {
-            "r" => executors::load_from_stdin()?.save_default(),
-            "w" => executors::load_default()?
-                .to_json()
-                .map(|json| println!("{}", json)),
-            "t" => Ok(executors::load_default()?
-                .list_targets()
-                .into_iter()
-                .for_each(|target| println!("{}", target))),
-            "s" => {
-                if args.len() < 3 {
-                    new_error(VaiErrorType::NoTarget)
-                } else {
-                    let executors = executors::load_default()?;
-                    let target = executors
-                        .find(&args[2])
-                        .ok_or(VaiError(VaiErrorType::UnknownTarget))?;
-                    let query = &extract_query(args, 3)?;
-                    target
-                        .suggest(&query)?
-                        .into_iter()
-                        .for_each(|entry| println!("{}", entry));
-                    target
-                        .complete(&query)?
-                        .into_iter()
-                        .for_each(|entry| println!("{}", entry));
-                    Ok(())
-                }
+    match args[0].as_str() {
+        "-r" => executors::load_from_stdin()?.save_default(),
+        "-w" => executors::load_default()?
+            .to_json()
+            .map(|json| println!("{}", json)),
+        "-t" => Ok(executors::load_default()?
+            .list_targets()
+            .into_iter()
+            .for_each(|target| println!("{}", target))),
+        "-s" => {
+            if args.len() < 2 {
+                new_error(VaiErrorType::NoTarget)
+            } else {
+                let executors = executors::load_default()?;
+                let target = executors
+                    .find(&args[1])
+                    .ok_or(VaiError(VaiErrorType::UnknownTarget))?;
+                let query = match extract_query(args, 2) {
+                    Ok(query) => query,
+                    Err(_) => return Ok(()),
+                };
+
+                target
+                    .suggest(&query)
+                    .unwrap_or(vec![])
+                    .into_iter()
+                    .for_each(|entry| println!("{}", entry));
+                target
+                    .complete(&query)
+                    .unwrap_or(vec![])
+                    .into_iter()
+                    .for_each(|entry| println!("{}", entry));
+                Ok(())
             }
-            _ => new_error(VaiErrorType::UnknownCommand),
         }
+        _ => new_error(VaiErrorType::UnknownCommand),
     }
 }
 
@@ -104,7 +106,7 @@ fn main() -> Result {
     if args.is_empty() {
         new_error(VaiErrorType::NoArguments)
     } else {
-        if args[0] == "-" {
+        if args[0].chars().next().ok_or(VaiError(VaiErrorType::EmptyArgument))? == '-' {
             support(args)
         } else {
             execute(args)
