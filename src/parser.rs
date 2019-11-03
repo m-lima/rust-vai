@@ -43,7 +43,7 @@ impl<'a> serde::Deserialize<'a> for Google {
                 visitor.next_element::<String>()?;
                 let phrases = visitor
                     .next_element::<Vec<String>>()?
-                    .ok_or(serde::de::Error::invalid_length(2, &self))?;
+                    .ok_or_else(|| serde::de::Error::invalid_length(2, &self))?;
                 Ok(Google(phrases))
             }
         }

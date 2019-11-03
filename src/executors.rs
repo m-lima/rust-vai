@@ -3,8 +3,8 @@ use super::Result;
 
 use serde::{Deserialize, Serialize};
 
-const HISTORY_PREFIX: &'static str = "history_";
-const CONFIG_FILE: &'static str = "config";
+const HISTORY_PREFIX: &str = "history_";
+const CONFIG_FILE: &str = "config";
 
 #[derive(Debug, Clone)]
 struct PathError;
@@ -43,7 +43,7 @@ pub fn load_default() -> Result<Executors> {
 
 fn default_path() -> Result<std::path::PathBuf> {
     std::env::var("VAI_CONFIG")
-        .map(|var| std::path::PathBuf::from(var))
+        .map(std::path::PathBuf::from)
         .or_else(|_| match dirs::config_dir() {
             Some(path) => Ok(path.join("vai")),
             None => Err(PathError.into()),
@@ -73,29 +73,29 @@ impl Executor {
         }
     }
 
-    fn save_history(&self, query: &String) -> Result {
+    fn save_history(&self, query: &str) -> Result {
         let path =
             default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
         let history = std::fs::read_to_string(&path)
             .map(|string| {
                 string
                     .lines()
-                    .filter(|line| line != query)
+                    .filter(|line| *line != query)
                     .collect::<Vec<&str>>()
                     .join("\n")
             })
-            .unwrap_or(String::new());
+            .unwrap_or_else(|_| String::new());
         let data = format!("{}\n{}\n", query, history);
         std::fs::write(&path, data).map_err(std::convert::Into::into)
     }
 
-    pub fn execute(&self, query: &String) -> Result {
+    pub fn execute(&self, query: &str) -> Result {
         let url = format!("{}{}", &self.command, query);
         webbrowser::open(url.as_str())?;
         self.save_history(query)
     }
 
-    pub fn complete(&self, query: &String) -> Result<Vec<String>> {
+    pub fn complete(&self, query: &str) -> Result<Vec<String>> {
         use std::io::BufRead;
         let path =
             default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
@@ -111,10 +111,10 @@ impl Executor {
                     .filter(|line| line.starts_with(query))
                     .collect()
             })
-            .or(Ok(vec![]))
+            .or_else(|_| Ok(vec![]))
     }
 
-    pub fn suggest(&self, query: &String) -> Result<Vec<String>> {
+    pub fn suggest(&self, query: &str) -> Result<Vec<String>> {
         if query.len() < 3 || self.suggestion.is_empty() || self.parser == parser::Parser::NONE {
             return Ok(vec![]);
         }
@@ -164,7 +164,7 @@ impl Executors {
         serde_json::to_string_pretty(&self).map_err(std::convert::Into::into)
     }
 
-    pub fn find(&self, name: &String) -> Option<&Executor> {
+    pub fn find(&self, name: &str) -> Option<&Executor> {
         let lower_case_name = name.to_lowercase();
         for executor in self.executors() {
             if executor.name == lower_case_name {

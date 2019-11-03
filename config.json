@@ -2,7 +2,7 @@
   {
     "name": "start",
     "command": "https://www.startpage.com/sp/search?t=blak&lui=english&language=english&cat=web&query=",
-    "suggestion": "https://www.startpage.com/do/suggest?limit=10&format=json&query=",
+    "suggestion": "https://suggestqueries.google.com/complete/search?output=firefox&q=",
     "parser": "GOOGLE"
   },
   {

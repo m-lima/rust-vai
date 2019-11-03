@@ -7,7 +7,7 @@ mod parser;
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Debug, Clone)]
-enum VaiErrorType {
+enum ErrorType {
     NoArguments,
     EmptyArgument,
     NoQuery,
@@ -17,7 +17,7 @@ enum VaiErrorType {
 }
 
 #[derive(Debug, Clone)]
-struct VaiError(VaiErrorType);
+struct VaiError(ErrorType);
 impl std::error::Error for VaiError {}
 impl std::fmt::Display for VaiError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
@@ -25,25 +25,25 @@ impl std::fmt::Display for VaiError {
             fmt,
             "{}",
             match self.0 {
-                VaiErrorType::NoArguments => "No arguments specified",
-                VaiErrorType::EmptyArgument => "Empty argument specified",
-                VaiErrorType::NoQuery => "No query specified",
-                VaiErrorType::NoTarget => "No target specified",
-                VaiErrorType::UnknownTarget => "Unrecognized target",
-                VaiErrorType::UnknownCommand => "Unrecognized command",
+                ErrorType::NoArguments => "No arguments specified",
+                ErrorType::EmptyArgument => "Empty argument specified",
+                ErrorType::NoQuery => "No query specified",
+                ErrorType::NoTarget => "No target specified",
+                ErrorType::UnknownTarget => "Unrecognized target",
+                ErrorType::UnknownCommand => "Unrecognized command",
             }
         )
     }
 }
 
 #[inline(always)]
-fn new_error<T>(error: VaiErrorType) -> Result<T> {
+fn new_error<T>(error: ErrorType) -> Result<T> {
     Err(VaiError(error).into())
 }
 
 fn extract_query(args: Vec<String>, index: usize) -> Result<String> {
     if args.len() <= index {
-        new_error(VaiErrorType::NoQuery)
+        new_error(ErrorType::NoQuery)
     } else {
         Ok(args
             .into_iter()
@@ -59,18 +59,21 @@ fn support(args: Vec<String>) -> Result {
         "-w" => executors::load_default()?
             .to_json()
             .map(|json| println!("{}", json)),
-        "-t" => Ok(executors::load_default()?
-            .list_targets()
-            .into_iter()
-            .for_each(|target| println!("{}", target))),
+        "-t" => {
+            executors::load_default()?
+                .list_targets()
+                .into_iter()
+                .for_each(|target| println!("{}", target));
+            Ok(())
+        }
         "-s" => {
             if args.len() < 2 {
-                new_error(VaiErrorType::NoTarget)
+                new_error(ErrorType::NoTarget)
             } else {
                 let executors = executors::load_default()?;
                 let target = executors
                     .find(&args[1])
-                    .ok_or(VaiError(VaiErrorType::UnknownTarget))?;
+                    .ok_or(VaiError(ErrorType::UnknownTarget))?;
                 let query = match extract_query(args, 2) {
                     Ok(query) => query,
                     Err(_) => return Ok(()),
@@ -78,25 +81,25 @@ fn support(args: Vec<String>) -> Result {
 
                 target
                     .suggest(&query)
-                    .unwrap_or(vec![])
+                    .unwrap_or_else(|_| vec![])
                     .into_iter()
                     .for_each(|entry| println!("{}", entry));
                 target
                     .complete(&query)
-                    .unwrap_or(vec![])
+                    .unwrap_or_else(|_| vec![])
                     .into_iter()
                     .for_each(|entry| println!("{}", entry));
                 Ok(())
             }
         }
-        _ => new_error(VaiErrorType::UnknownCommand),
+        _ => new_error(ErrorType::UnknownCommand),
     }
 }
 
 fn execute(args: Vec<String>) -> Result {
     executors::load_default()?
         .find(&args[0])
-        .ok_or(VaiError(VaiErrorType::UnknownTarget))?
+        .ok_or_else(|| VaiError(ErrorType::UnknownTarget))?
         .execute(&extract_query(args, 1)?)
 }
 
@@ -104,12 +107,15 @@ fn main() -> Result {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     if args.is_empty() {
-        new_error(VaiErrorType::NoArguments)
+        new_error(ErrorType::NoArguments)
+    } else if args[0]
+        .chars()
+        .next()
+        .ok_or(VaiError(ErrorType::EmptyArgument))?
+        == '-'
+    {
+        support(args)
     } else {
-        if args[0].chars().next().ok_or(VaiError(VaiErrorType::EmptyArgument))? == '-' {
-            support(args)
-        } else {
-            execute(args)
-        }
+        execute(args)
     }
 }

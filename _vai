@@ -28,7 +28,6 @@ else
     esac
   else
     completions=(${(f)"$(vai -s ${arg} ${words:2})"})
-    words="${words[0]} ${words[1]} bla ble bli"
     _describe 'suggestions' completions
   fi
 fi

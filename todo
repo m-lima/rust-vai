@@ -1,7 +1,9 @@
 [ ]  Make it a library
-[ ]  - Make CLI front-end
-[ ]    - Make ZSH completions
-[ ]  - Make GUI front-end
+[ ]  Make CLI front-end
+[ ]  - Make ZSH completions
+[ ]  - Do not sort
+[ ]  - Allow multi-word completion
+[ ]  Make GUI front-end
 [ ]? Make it a daemon
 [X]! Implement parsers (raw deserializers?) for suggestions
 [X]  Aggregate suggestions (history + web)
