@@ -64,8 +64,8 @@ pub fn load_from_stdin() -> Result<Executors> {
 }
 
 impl Executor {
-    fn clean_up_name(self) -> Executor {
-        Executor {
+    fn clean_up_name(self) -> Self {
+        Self {
             name: self.name.to_lowercase(),
             command: self.command,
             suggestion: self.suggestion,
@@ -77,14 +77,14 @@ impl Executor {
         let path =
             default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
         let history = std::fs::read_to_string(&path)
-            .map(|string| {
+            .ok()
+            .map_or_else(String::new, |string| {
                 string
                     .lines()
                     .filter(|line| *line != query)
                     .collect::<Vec<&str>>()
                     .join("\n")
-            })
-            .unwrap_or_else(|_| String::new());
+            });
         let data = format!("{}\n{}\n", query, history);
         std::fs::write(&path, data).map_err(std::convert::Into::into)
     }
@@ -129,12 +129,12 @@ impl Executor {
             response.into_string()?
         };
 
-        parser::parse(&self.parser, result)
+        parser::parse(&self.parser, &result)
     }
 }
 
 impl Executors {
-    #[inline(always)]
+    #[inline]
     fn executors(&self) -> &Vec<Executor> {
         &self.0
     }

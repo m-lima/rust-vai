@@ -19,7 +19,7 @@ struct DuckPhrase {
 }
 
 impl<'a> serde::Deserialize<'a> for Google {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Google, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'a>,
     {
@@ -52,23 +52,23 @@ impl<'a> serde::Deserialize<'a> for Google {
 }
 
 impl Duck {
-    #[inline(always)]
+    #[inline]
     fn phrases(self) -> Vec<DuckPhrase> {
         self.0
     }
 }
 
 impl DuckPhrase {
-    #[inline(always)]
+    #[inline]
     fn phrase(self) -> String {
         self.phrase
     }
 }
 
-pub fn parse(parser: &Parser, result: String) -> Result<Vec<String>> {
+pub fn parse(parser: &Parser, result: &str) -> Result<Vec<String>> {
     match parser {
-        Parser::GOOGLE => Ok(serde_json::from_str::<Google>(result.as_str())?.0),
-        Parser::DUCK => Ok(serde_json::from_str::<Duck>(result.as_str())
+        Parser::GOOGLE => Ok(serde_json::from_str::<Google>(result)?.0),
+        Parser::DUCK => Ok(serde_json::from_str::<Duck>(result)
             .map(Duck::phrases)?
             .into_iter()
             .map(DuckPhrase::phrase)
@@ -83,7 +83,7 @@ mod tests {
 
     #[test]
     fn test_google_parsing() {
-        let result =  String::from(r#"["bla",["bladet","blake shelton","black","black panther","blake lively","black mirror","blank","bladkongen","blade runner","blacklist"]]"#);
+        let result =  r#"["bla",["bladet","blake shelton","black","black panther","blake lively","black mirror","blank","bladkongen","blade runner","blacklist"]]"#;
         let suggestions = parse(&Parser::GOOGLE, result).unwrap();
         assert_eq!(suggestions.len(), 10);
         assert_eq!(suggestions[0], "bladet");
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn test_duck_parsing() {
-        let result =  String::from(r#"[{"phrase":"gopher football"},{"phrase":"gopher"},{"phrase":"gophersports.com"},{"phrase":"gopher football schedule"},{"phrase":"gopher sports"},{"phrase":"gopher 5 winning numbers"},{"phrase":"gopher football score"},{"phrase":"gopher snake"},{"phrase":"gopher hockey"},{"phrase":"gopher volleyball"}]"#);
+        let result =  r#"[{"phrase":"gopher football"},{"phrase":"gopher"},{"phrase":"gophersports.com"},{"phrase":"gopher football schedule"},{"phrase":"gopher sports"},{"phrase":"gopher 5 winning numbers"},{"phrase":"gopher football score"},{"phrase":"gopher snake"},{"phrase":"gopher hockey"},{"phrase":"gopher volleyball"}]"#;
         let suggestions = parse(&Parser::DUCK, result).unwrap();
         assert_eq!(suggestions.len(), 10);
         assert_eq!(suggestions[0], "gopher football");

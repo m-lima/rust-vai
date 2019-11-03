@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
 
 mod executors;
@@ -36,7 +37,7 @@ impl std::fmt::Display for VaiError {
     }
 }
 
-#[inline(always)]
+#[inline]
 fn new_error<T>(error: ErrorType) -> Result<T> {
     Err(VaiError(error).into())
 }
