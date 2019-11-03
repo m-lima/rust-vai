@@ -24,6 +24,35 @@ impl std::fmt::Display for FetchError {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct FuzzyMatch(i64, String);
+
+impl FuzzyMatch {
+    fn new(choice: String, pattern: &str) -> Option<Self> {
+        Some(Self(
+            fuzzy_matcher::skim::fuzzy_match(choice.as_str(), pattern)?,
+            choice,
+        ))
+    }
+
+    #[inline]
+    fn matched(self) -> String {
+        self.1
+    }
+}
+
+impl Ord for FuzzyMatch {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl PartialOrd for FuzzyMatch {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executor {
     name: String,
@@ -97,6 +126,7 @@ impl Executor {
 
     pub fn complete(&self, query: &str) -> Result<Vec<String>> {
         use std::io::BufRead;
+
         let path =
             default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
         std::fs::OpenOptions::new()
@@ -106,9 +136,15 @@ impl Executor {
             .map(std::io::BufReader::new)
             .map(std::io::BufReader::lines)
             .map(|lines| {
-                lines
+                let mut completions: Vec<FuzzyMatch> = lines
                     .filter_map(std::result::Result::ok)
-                    .filter(|line| line.starts_with(query))
+                    .filter_map(|line| FuzzyMatch::new(line, &query))
+                    .collect();
+                completions.sort_unstable();
+                completions
+                    .into_iter()
+                    .take(10)
+                    .map(FuzzyMatch::matched)
                     .collect()
             })
             .or_else(|_| Ok(vec![]))
