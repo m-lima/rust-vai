@@ -54,6 +54,20 @@ fn extract_query(args: Vec<String>, index: usize) -> Result<String> {
     }
 }
 
+trait FirstCharacter {
+    fn first_char(&self) -> Result<char>;
+}
+
+impl FirstCharacter for Vec<String> {
+    fn first_char(&self) -> Result<char> {
+        self[0]
+            .chars()
+            .next()
+            .ok_or(VaiError(ErrorType::EmptyArgument))
+            .map_err(std::convert::Into::into)
+    }
+}
+
 fn support(args: Vec<String>) -> Result {
     match args[0].as_str() {
         "-r" => executors::load_from_stdin()?.save_default(),
@@ -109,12 +123,7 @@ fn main() -> Result {
 
     if args.is_empty() {
         new_error(ErrorType::NoArguments)
-    } else if args[0]
-        .chars()
-        .next()
-        .ok_or(VaiError(ErrorType::EmptyArgument))?
-        == '-'
-    {
+    } else if args.first_char()? == '-' {
         support(args)
     } else {
         execute(args)

@@ -157,11 +157,9 @@ impl Executor {
 
         let result = {
             let response = ureq::get(format!("{}{}", self.suggestion, query).as_str()).call();
-
             if !response.ok() {
                 return Err(FetchError(response.status()).into());
             }
-
             response.into_string()?
         };
 
