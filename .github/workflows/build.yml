@@ -1,4 +1,4 @@
-name: build
+name: Build
 
 on: [push]
 
@@ -9,5 +9,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+    - name: Format
+      run: cargo fmt --all -- --check
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --all-targets
+    - name: Lint
+      run: cargo clippy
+    - name: Test
+      run: cargo test --no-fail-fast --verbose --all -- --nocapture
