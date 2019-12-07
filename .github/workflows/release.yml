@@ -63,7 +63,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.get_release_info.outputs.upload_url }} 
+        upload_url: ${{ steps.recover_url.outputs.upload_url }} 
         asset_path: ./target/release/vai
         asset_name: vai-${{ matrix.os }}
         asset_content_type: application/octet-stream
