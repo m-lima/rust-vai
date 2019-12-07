@@ -1,0 +1,13 @@
+version: 1.0.{build}
+
+install:
+  - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
+  - rustup-init -yv
+  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+  - rustc -vV
+  - cargo -vV
+
+build: off
+
+test_script:
+  - cargo test --verbose %cargoflags%
