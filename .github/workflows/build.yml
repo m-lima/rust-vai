@@ -11,6 +11,7 @@ jobs:
     - name: Prepare
       uses: actions-rs/toolchain@v1
       with:
+        toolchain: stable
         components: clippy, rustfmt
         override: true
     - name: Format
