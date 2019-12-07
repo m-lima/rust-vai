@@ -1,0 +1,68 @@
+name: release
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Create
+      id: create_release
+      uses: actions/create-release@v1.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    - name: Capture URL
+      run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
+    - name: Save URL
+      uses: actions/upload-artifact@v1
+      with:
+        name: release_url
+        path: release_url.txt
+  build:
+    needs: [release]
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          - windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+    - name: Prepare
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - name: Build
+      uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --verbose --release
+    - name: Recover URL
+        id: recover_url
+        run: |
+          value=`cat release_url/release_url.txt`
+          echo ::set-output name=upload_url::$value
+    - name: Upload Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./target/release/vai
+        asset_name: vai-${{ os.matrix }}
+        asset_content_type: application/octet-stream
+
+  
