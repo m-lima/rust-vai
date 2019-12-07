@@ -1,13 +1,15 @@
 version: 1.0.{build}
 
 install:
-  - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
-  - rustup-init -yv
-  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
-  - rustc -vV
-  - cargo -vV
+  - curl -sSf -o rustup-init.exe https://win.rustup.rs
+  - rustup-init.exe -y
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - rustc -Vv
+  - cargo -V
 
 build: off
 
 test_script:
-  - cargo test --verbose %cargoflags%
+  - cargo fmt --all -- --check
+  - cargo clippy
+  - cargo test --no-fail-fast --verbose --all -- --nocapture

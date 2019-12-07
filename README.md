@@ -1,6 +1,4 @@
 Vai
 ========
-[![Format](https://github.com/m-lima/rust-vai/workflows/fmt/badge.svg)](https://github.com/m-lima/rust-vai/actions?workflow=fmt)
-[![Build](https://github.com/m-lima/rust-vai/workflows/build/badge.svg)](https://github.com/m-lima/rust-vai/actions?workflow=build)
-[![Clippy](https://github.com/m-lima/rust-vai/workflows/clippy/badge.svg)](https://github.com/m-lima/rust-vai/actions?workflow=clippy)
-[![Test](https://github.com/m-lima/rust-vai/workflows/test/badge.svg)](https://github.com/m-lima/rust-vai/actions?workflow=test)
+[![Build](https://github.com/m-lima/rust-vai/workflows/Build/badge.svg)](https://github.com/m-lima/rust-vai/actions?workflow=Build)
+[![Build status](https://ci.appveyor.com/api/projects/status/sv6wqqb7s6wo1e0x?svg=true)](https://ci.appveyor.com/project/mlima/rust-vai)
