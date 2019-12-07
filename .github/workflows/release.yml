@@ -55,9 +55,7 @@ jobs:
         name: release_url
     - name: Load release URL
       id: recover_url
-      run: |
-        value=$(cat release_url/release_url.txt)
-        echo ::set-output name=upload_url::$value
+      run: echo ::set-output name=upload_url::$(cat release_url/release_url.txt)
     - name: Upload Asset
       uses: actions/upload-release-asset@v1.0.1
       env:
