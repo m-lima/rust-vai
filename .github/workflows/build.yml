@@ -10,26 +10,26 @@ jobs:
       uses: actions/checkout@v1
     - name: Prepare
       uses: actions-rs/toolchain@v1
-        with:
-          components: clippy, rustfmt
-          override: true
+      with:
+        components: clippy, rustfmt
+        override: true
     - name: Format
       uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      with:
+        command: fmt
+        args: --all -- --check
     - name: Build
       uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --verbose --all-targets
+      with:
+        command: build
+        args: --verbose --all-targets
     - name: Lint
       uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        args: --all-features
     - name: Test
       uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-fail-fast --verbose --all -- --nocapture
+      with:
+        command: test
+        args: --no-fail-fast --verbose --all -- --nocapture
