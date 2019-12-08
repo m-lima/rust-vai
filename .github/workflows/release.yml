@@ -28,9 +28,9 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
+        body: Changes since last release
         draft: false
         prerelease: false
-        body: '**Changes since last release:**'
     - name: Capture URL
       run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
     - name: Save URL
