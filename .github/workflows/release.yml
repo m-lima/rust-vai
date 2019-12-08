@@ -64,9 +64,9 @@ jobs:
         name: release_url
     - name: Load release URL
       id: recover_url
-      #::set-output name=upload_url::$(cat release_url/release_url.txt)
       run: echo "##[set-output name=upload_url;]$(cat release_url/release_url.txt)"
-    - name: Upload Asset
+    - name: Upload asset (UNIX)
+      if: matrix.os != 'windows-latest'
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -74,5 +74,15 @@ jobs:
         upload_url: ${{ steps.recover_url.outputs.upload_url }}
         asset_path: ./target/release/vai
         asset_name: vai-${{ matrix.os }}
+        asset_content_type: application/octet-stream
+    - name: Upload asset (WINDOWS)
+      if: matrix.os == 'windows-latest'
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.recover_url.outputs.upload_url }}
+        asset_path: ./target/release/vai.exe
+        asset_name: vai-${{ matrix.os }}.exe
         asset_content_type: application/octet-stream
 
