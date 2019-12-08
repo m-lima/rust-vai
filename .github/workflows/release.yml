@@ -31,6 +31,15 @@ jobs:
         draft: false
         prerelease: false
         body: '**Changes since last release**\n${{ steps.release_body.outputs.release_body }}'
+    - name: Upload asset (WINDOWS)
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./config.json
+        asset_name: example_config.json
+        asset_content_type: application/json
     - name: Capture URL
       run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
     - name: Save URL
