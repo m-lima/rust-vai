@@ -2,9 +2,6 @@
 #![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
 
-mod executors;
-mod parser;
-
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Debug, Clone)]
@@ -70,12 +67,12 @@ impl FirstCharacter for Vec<String> {
 
 fn support(args: Vec<String>) -> Result {
     match args[0].as_str() {
-        "-r" => executors::load_from_stdin()?.save_default(),
-        "-w" => executors::load_default()?
+        "-r" => vai::executors::load_from_stdin()?.save_default(),
+        "-w" => vai::executors::load_default()?
             .to_json()
             .map(|json| println!("{}", json)),
         "-t" => {
-            executors::load_default()?
+            vai::executors::load_default()?
                 .list_targets()
                 .into_iter()
                 .for_each(|target| println!("{}", target));
@@ -85,7 +82,7 @@ fn support(args: Vec<String>) -> Result {
             if args.len() < 2 {
                 new_error(ErrorType::NoTarget)
             } else {
-                let executors = executors::load_default()?;
+                let executors = vai::executors::load_default()?;
                 let target = executors
                     .find(&args[1])
                     .ok_or(VaiError(ErrorType::UnknownTarget))?;
@@ -112,7 +109,7 @@ fn support(args: Vec<String>) -> Result {
 }
 
 fn execute(args: Vec<String>) -> Result {
-    executors::load_default()?
+    vai::executors::load_default()?
         .find(&args[0])
         .ok_or_else(|| VaiError(ErrorType::UnknownTarget))?
         .execute(&extract_query(args, 1)?)

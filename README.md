@@ -2,6 +2,16 @@ Vai [![Github](https://github.com/m-lima/rust-vai/workflows/build/badge.svg)](ht
 ========
 > A browser query launcher
 
+## Quick start
+```bash
+$ git clone https://github.com/m-lima/rust-vai
+$ cd rust-vai
+$ cargo install --path .
+$ cat config.json | vai -r
+$ # Now you can just use it!
+$ vai youtube rust jon gjengset
+```
+
 ## Configuration
 
 | Field        | Description |
@@ -10,6 +20,13 @@ Vai [![Github](https://github.com/m-lima/rust-vai/workflows/build/badge.svg)](ht
 | `command`    | URL to use when calling the browser for this target. Query will be appended to it |
 | `suggestion` | URL to use for suggestions from the target. Query will be appended to it |
 | `parser`     | How to parse the suggestions. One of `GOOGLE`, `DUCK`, `NONE` |
+
+#### Quick setup
+You can load a JSON configuration to `vai` directly using the `-r` flag
+```bash
+$ cd <this_repository>
+$ cat config.json | vai -r
+```
 
 #### Example
 ```json
