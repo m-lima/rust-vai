@@ -20,6 +20,7 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: false
+        body: $(git log --format='[%h] %s' $(git describe --tags --abbrev=0 HEAD~1)..${{ github.ref }})
     - name: Capture URL
       run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
     - name: Save URL
@@ -27,6 +28,7 @@ jobs:
       with:
         name: release_url
         path: release_url.txt
+
   build:
     needs: [release]
     name: Build
@@ -55,15 +57,14 @@ jobs:
         name: release_url
     - name: Load release URL
       id: recover_url_posix
-      run: echo "##[set-output name=upload_url;]$(cat release_url/release_url.txt)"
+      run: echo ::set-output name=upload_url::$(cat release_url/release_url.txt)
     - name: Upload Asset
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.recover_url.outputs.upload_url }} 
+        upload_url: ${{ steps.recover_url.outputs.upload_url }}
         asset_path: ./target/release/vai
         asset_name: vai-${{ matrix.os }}
         asset_content_type: application/octet-stream
 
-  
