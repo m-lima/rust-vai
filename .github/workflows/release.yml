@@ -30,7 +30,9 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: false
-        body: ${{ steps.release_body.outputs.release_body }}
+        body: |
+          "**Changes since last release:**"
+          "${{ steps.release_body.outputs.release_body }}"
     - name: Capture URL
       run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
     - name: Save URL
@@ -39,53 +41,53 @@ jobs:
         name: release_url
         path: release_url.txt
 
-  build:
-    needs: [release]
-    name: Build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macOS-latest
-          - windows-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v1
-    - name: Prepare
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-    - name: Build
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-        args: --verbose --release
-    - name: Recover release URL
-      uses: actions/download-artifact@v1
-      with:
-        name: release_url
-    - name: Load release URL
-      id: recover_url
-      run: echo "::set-output name=upload_url::$(cat release_url/release_url.txt)"
-    - name: Upload asset (UNIX)
-      if: matrix.os != 'windows-latest'
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.recover_url.outputs.upload_url }}
-        asset_path: ./target/release/vai
-        asset_name: vai-${{ matrix.os }}
-        asset_content_type: application/octet-stream
-    - name: Upload asset (WINDOWS)
-      if: matrix.os == 'windows-latest'
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.recover_url.outputs.upload_url }}
-        asset_path: ./target/release/vai.exe
-        asset_name: vai-${{ matrix.os }}.exe
-        asset_content_type: application/octet-stream
+  # build:
+  #   needs: [release]
+  #   name: Build
+  #   runs-on: ${{ matrix.os }}
+  #   strategy:
+  #     matrix:
+  #       os:
+  #         - ubuntu-latest
+  #         - macOS-latest
+  #         - windows-latest
+  #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v1
+  #   - name: Prepare
+  #     uses: actions-rs/toolchain@v1
+  #     with:
+  #       toolchain: stable
+  #   - name: Build
+  #     uses: actions-rs/cargo@v1
+  #     with:
+  #       command: build
+  #       args: --verbose --release
+  #   - name: Recover release URL
+  #     uses: actions/download-artifact@v1
+  #     with:
+  #       name: release_url
+  #   - name: Load release URL
+  #     id: recover_url
+  #     run: echo "::set-output name=upload_url::$(cat release_url/release_url.txt)"
+  #   - name: Upload asset (UNIX)
+  #     if: matrix.os != 'windows-latest'
+  #     uses: actions/upload-release-asset@v1.0.1
+  #     env:
+  #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     with:
+  #       upload_url: ${{ steps.recover_url.outputs.upload_url }}
+  #       asset_path: ./target/release/vai
+  #       asset_name: vai-${{ matrix.os }}
+  #       asset_content_type: application/octet-stream
+  #   - name: Upload asset (WINDOWS)
+  #     if: matrix.os == 'windows-latest'
+  #     uses: actions/upload-release-asset@v1.0.1
+  #     env:
+  #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     with:
+  #       upload_url: ${{ steps.recover_url.outputs.upload_url }}
+  #       asset_path: ./target/release/vai.exe
+  #       asset_name: vai-${{ matrix.os }}.exe
+  #       asset_content_type: application/octet-stream
 
