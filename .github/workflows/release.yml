@@ -25,7 +25,8 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: false
-        body: ${{ steps.release_body.outputs.release_body }}
+        body: |
+          ${{ steps.release_body.outputs.release_body }}
     - name: Capture URL
       run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
     - name: Save URL
