@@ -2,18 +2,17 @@
 #![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
 
+mod prompt;
+
 use vai_core as core;
 
 type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 enum Error {
-    NoArguments,
-    EmptyArgument,
     NoQuery,
-    NoTarget,
     UnknownTarget,
-    UnknownCommand,
+    UnknownCommand(String),
     Core(core::error::Error),
 }
 
@@ -28,15 +27,19 @@ impl std::convert::From<core::error::Error> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            Error::NoArguments => write!(fmt, "No arguments specified"),
-            Error::EmptyArgument => write!(fmt, "Empty argument specified"),
             Error::NoQuery => write!(fmt, "No query specified"),
-            Error::NoTarget => write!(fmt, "No target specified"),
             Error::UnknownTarget => write!(fmt, "Unrecognized target"),
-            Error::UnknownCommand => write!(fmt, "Unrecognized command"),
+            Error::UnknownCommand(command) => write!(fmt, "Unrecognized command: {}", command),
             Error::Core(err) => write!(fmt, "{}", err),
         }
     }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum Mode {
+    Prompt,
+    Command(Vec<String>),
+    Execute(Vec<String>),
 }
 
 // struct Flag {
@@ -112,34 +115,15 @@ impl std::fmt::Display for Error {
 //     }
 // }
 
-#[inline]
-fn new_error<T>(error: Error) -> Result<T> {
-    Err(error.into())
-}
-
 fn extract_query(args: Vec<String>, index: usize) -> Result<String> {
     if args.len() <= index {
-        new_error(Error::NoQuery)
+        Err(Error::NoQuery)
     } else {
         Ok(args
             .into_iter()
             .skip(index)
             .collect::<Vec<String>>()
             .join(" "))
-    }
-}
-
-trait FirstCharacter {
-    fn first_char(&self) -> Result<char>;
-}
-
-impl FirstCharacter for Vec<String> {
-    fn first_char(&self) -> Result<char> {
-        self[0]
-            .chars()
-            .next()
-            .ok_or(Error::EmptyArgument)
-            .map_err(std::convert::Into::into)
     }
 }
 
@@ -187,6 +171,14 @@ fn print_usage() -> ! {
     std::process::exit(0);
 }
 
+fn print_targets() -> Result {
+    core::executors::load_default()?
+        .list_targets()
+        .into_iter()
+        .for_each(|target| println!("{}", target));
+    Ok(())
+}
+
 fn support(args: Vec<String>) -> Result {
     match args[0].as_str() {
         "-h" | "--help" => print_usage(),
@@ -197,16 +189,10 @@ fn support(args: Vec<String>) -> Result {
             .to_json()
             .map(|json| println!("{}", json))
             .map_err(Error::from),
-        "-t" | "--targets" => {
-            core::executors::load_default()?
-                .list_targets()
-                .into_iter()
-                .for_each(|target| println!("{}", target));
-            Ok(())
-        }
+        "-t" | "--targets" => print_targets(),
         "-s" | "--suggest" => {
             if args.len() < 2 {
-                new_error(Error::NoTarget)
+                print_targets()
             } else {
                 let executors = core::executors::load_default()?;
                 let target = executors.find(&args[1]).ok_or(Error::UnknownTarget)?;
@@ -228,7 +214,7 @@ fn support(args: Vec<String>) -> Result {
                 Ok(())
             }
         }
-        _ => new_error(Error::UnknownCommand),
+        command => Err(Error::UnknownCommand(String::from(command))),
     }
 }
 
@@ -240,18 +226,63 @@ fn execute(args: Vec<String>) -> Result {
         .map_err(Error::from)
 }
 
-fn run() -> Result {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+fn select_mode<I: std::iter::Iterator<Item = String>>(input: I) -> Mode {
+    let args: Vec<String> = input
+        .skip(1)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
 
     if args.is_empty() {
-        new_error(Error::NoArguments)
-    } else if args.first_char()? == '-' {
-        support(args)
+        Mode::Prompt
+    } else if args[0].starts_with('-') {
+        Mode::Command(args)
     } else {
-        execute(args)
+        Mode::Execute(args)
     }
 }
 
 fn main() {
-    run().unwrap_or_else(|err| eprintln!("{}", err));
+    match select_mode(std::env::args()) {
+        Mode::Prompt => prompt::run(),
+        Mode::Command(args) => support(args),
+        Mode::Execute(args) => execute(args),
+    }
+    .unwrap_or_else(|err| eprintln!("{}", err));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! args {
+        ($($x:expr),*) => (
+            <[String]>::into_vec(Box::new([String::from("vai"), $(String::from($x)),*])).into_iter()
+        );
+    }
+
+    fn param(param: &str) -> Vec<String> {
+        vec![String::from(param)]
+    }
+
+    #[test]
+    fn test_prompt_mode() {
+        assert_eq!(select_mode(args!["", ""]), Mode::Prompt);
+        assert_eq!(select_mode(args!["     "]), Mode::Prompt);
+        assert_eq!(select_mode(args!["     ", "", ""]), Mode::Prompt);
+    }
+
+    #[test]
+    fn test_command_mode() {
+        assert_eq!(select_mode(args!["", "-"]), Mode::Command(param("-")));
+        assert_eq!(select_mode(args!["  -  "]), Mode::Command(param("-")));
+        assert_eq!(select_mode(args!["  ", "", "-"]), Mode::Command(param("-")));
+    }
+
+    #[test]
+    fn test_execution_mode() {
+        assert_eq!(select_mode(args!["", "a"]), Mode::Execute(param("a")));
+        assert_eq!(select_mode(args!["  a  "]), Mode::Execute(param("a")));
+        assert_eq!(select_mode(args!["  ", "", "a"]), Mode::Execute(param("a")));
+    }
 }

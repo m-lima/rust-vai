@@ -5,4 +5,6 @@ authors = ["Marcelo Lima <marcelowind@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+colored = "1.9"
+tokio = { version = "0.2", features = ["macros", "io-std", "io-util"] }
 vai-core = { path = ".." }
