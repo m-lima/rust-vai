@@ -1,8 +1,13 @@
 [package]
-name = "vai"
+name = "vai-core"
 version = "0.1.0"
 authors = ["Marcelo Lima <marcelowind@gmail.com>"]
 edition = "2018"
+
+[workspace]
+members = [
+    "cli",
+]
 
 [dependencies]
 bincode = "1.0"

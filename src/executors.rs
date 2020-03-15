@@ -7,20 +7,17 @@ const HISTORY_PREFIX: &str = "history_";
 const CONFIG_FILE: &str = "config";
 
 #[derive(Debug, Clone)]
-struct PathError;
-impl std::error::Error for PathError {}
-impl std::fmt::Display for PathError {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(fmt, "Could not infer HOME directory")
-    }
+enum Error {
+    Path,
+    Fetch(u16),
 }
-
-#[derive(Debug, Clone)]
-struct FetchError(u16);
-impl std::error::Error for FetchError {}
-impl std::fmt::Display for FetchError {
+impl std::error::Error for Error {}
+impl std::fmt::Display for Error {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(fmt, "Got status code {} from suggest query", self.0)
+        match self {
+            Error::Path => write!(fmt, "Could not infer HOME directory"),
+            Error::Fetch(status) => write!(fmt, "Got status code {} from suggest query", status),
+        }
     }
 }
 
@@ -59,37 +56,6 @@ pub struct Executor {
     command: String,
     suggestion: String,
     parser: parser::Parser,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Executors(Vec<Executor>);
-
-pub fn load_default() -> Result<Executors> {
-    default_path()
-        .map(|path| path.join(CONFIG_FILE))
-        .and_then(load)
-}
-
-fn default_path() -> Result<std::path::PathBuf> {
-    std::env::var("VAI_CONFIG")
-        .map(std::path::PathBuf::from)
-        .or_else(|_| match dirs::config_dir() {
-            Some(path) => Ok(path.join("vai")),
-            None => Err(PathError.into()),
-        })
-}
-
-pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
-    bincode::deserialize(std::fs::read(&path)?.as_slice())
-        .map(Executors)
-        .map_err(std::convert::Into::into)
-}
-
-pub fn load_from_stdin() -> Result<Executors> {
-    let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())?;
-    Ok(Executors(
-        executors.into_iter().map(Executor::clean_up_name).collect(),
-    ))
 }
 
 impl Executor {
@@ -158,13 +124,44 @@ impl Executor {
         let result = {
             let response = ureq::get(format!("{}{}", self.suggestion, query).as_str()).call();
             if !response.ok() {
-                return Err(FetchError(response.status()).into());
+                return Err(Error::Fetch(response.status()).into());
             }
             response.into_string()?
         };
 
         parser::parse(&self.parser, &result)
     }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Executors(Vec<Executor>);
+
+pub fn load_default() -> Result<Executors> {
+    default_path()
+        .map(|path| path.join(CONFIG_FILE))
+        .and_then(load)
+}
+
+fn default_path() -> Result<std::path::PathBuf> {
+    std::env::var("VAI_CONFIG")
+        .map(std::path::PathBuf::from)
+        .or_else(|_| match dirs::config_dir() {
+            Some(path) => Ok(path.join("vai")),
+            None => Err(Error::Path.into()),
+        })
+}
+
+pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
+    bincode::deserialize(std::fs::read(&path)?.as_slice())
+        .map(Executors)
+        .map_err(std::convert::Into::into)
+}
+
+pub fn load_from_stdin() -> Result<Executors> {
+    let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())?;
+    Ok(Executors(
+        executors.into_iter().map(Executor::clean_up_name).collect(),
+    ))
 }
 
 impl Executors {

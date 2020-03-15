@@ -10,6 +10,7 @@
 
 ## CLI
   [ ] Make flags enum
+  [ ] Better error reporting
   
 ## UI
   [ ] Make UI

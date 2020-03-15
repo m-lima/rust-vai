@@ -1,0 +1,9 @@
+[package]
+name = "vai"
+version = "0.1.0"
+authors = ["Marcelo Lima <marcelowind@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+dirs = "2.0"
+vai-core = { path = ".." }
