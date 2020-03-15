@@ -38,7 +38,7 @@ impl std::fmt::Display for Error {
 
 #[derive(Debug, Eq, PartialEq)]
 enum Mode {
-    Prompt,
+    Interactive,
     Command(Vec<String>),
     Execute(Vec<String>),
 }
@@ -183,7 +183,7 @@ fn select_mode<I: std::iter::Iterator<Item = String>>(input: I) -> Mode {
         .collect::<Vec<_>>();
 
     if args.is_empty() {
-        Mode::Prompt
+        Mode::Interactive
     } else if args[0].starts_with('-') {
         Mode::Command(args)
     } else {
@@ -193,7 +193,13 @@ fn select_mode<I: std::iter::Iterator<Item = String>>(input: I) -> Mode {
 
 fn main() {
     match select_mode(std::env::args()) {
-        Mode::Prompt => prompt::run(),
+        Mode::Interactive => {
+            if atty::is(atty::Stream::Stdout) {
+                prompt::run(application_name())
+            } else {
+                unimplemented!("No GUI yet");
+            }
+        }
         Mode::Command(args) => support(args),
         Mode::Execute(args) => execute(args),
     }
@@ -219,9 +225,9 @@ mod tests {
 
     #[test]
     fn test_prompt_mode() {
-        assert_eq!(select_mode(args!["", ""]), Mode::Prompt);
-        assert_eq!(select_mode(args!["     "]), Mode::Prompt);
-        assert_eq!(select_mode(args!["     ", "", ""]), Mode::Prompt);
+        assert_eq!(select_mode(args!["", ""]), Mode::Interactive);
+        assert_eq!(select_mode(args!["     "]), Mode::Interactive);
+        assert_eq!(select_mode(args!["     ", "", ""]), Mode::Interactive);
     }
 
     #[test]

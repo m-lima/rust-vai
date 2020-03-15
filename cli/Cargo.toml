@@ -16,5 +16,4 @@ short_description = "A query launcher"
 [dependencies]
 atty = "0.2"
 colored = "1.9"
-tokio = { version = "0.2", features = ["macros", "io-std", "io-util"] }
 vai-core = { path = ".." }
