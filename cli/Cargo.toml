@@ -3,8 +3,18 @@ name = "vai"
 version = "0.1.0"
 authors = ["Marcelo Lima <marcelowind@gmail.com>"]
 edition = "2018"
+description = "A query launcher"
+
+[package.metadata.bundle]
+name = "Vai"
+identifier = "com.mflima.vai"
+icon = [ "res/icon*.png" ]
+version = "0.1.0"
+category = "public.app-category.utilities"
+short_description = "A query launcher"
 
 [dependencies]
+atty = "0.2"
 colored = "1.9"
 tokio = { version = "0.2", features = ["macros", "io-std", "io-util"] }
 vai-core = { path = ".." }

@@ -536,6 +536,7 @@ dependencies = [
 name = "vai"
 version = "0.1.0"
 dependencies = [
+ "atty",
  "colored",
  "tokio",
  "vai-core",
