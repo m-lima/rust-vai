@@ -4,7 +4,7 @@
 
 use vai_core as core;
 
-type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 enum Error {
@@ -14,9 +14,16 @@ enum Error {
     NoTarget,
     UnknownTarget,
     UnknownCommand,
+    Core(core::error::Error),
 }
 
 impl std::error::Error for Error {}
+
+impl std::convert::From<core::error::Error> for Error {
+    fn from(error: core::error::Error) -> Self {
+        Self::Core(error)
+    }
+}
 
 impl std::fmt::Display for Error {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
@@ -27,6 +34,7 @@ impl std::fmt::Display for Error {
             Error::NoTarget => write!(fmt, "No target specified"),
             Error::UnknownTarget => write!(fmt, "Unrecognized target"),
             Error::UnknownCommand => write!(fmt, "Unrecognized command"),
+            Error::Core(err) => write!(fmt, "{}", err),
         }
     }
 }
@@ -175,12 +183,6 @@ fn print_usage() -> ! {
     println!("-s, --suggest   Prints a list of suggestions for the given input");
     println!("-h, --help      Display this help message");
     println!();
-    println!("Configuration file is stored at:");
-    println!(" - $VAI_CONFIG (if defined)");
-
-    if let Some(path) = dirs::config_dir() {
-        println!(" - {}", path.join("vai").display());
-    }
 
     std::process::exit(0);
 }
@@ -188,10 +190,13 @@ fn print_usage() -> ! {
 fn support(args: Vec<String>) -> Result {
     match args[0].as_str() {
         "-h" | "--help" => print_usage(),
-        "-r" | "--read" => core::executors::load_from_stdin()?.save_default(),
+        "-r" | "--read" => core::executors::load_from_stdin()?
+            .save_default()
+            .map_err(Error::from),
         "-w" | "--write" => core::executors::load_default()?
             .to_json()
-            .map(|json| println!("{}", json)),
+            .map(|json| println!("{}", json))
+            .map_err(Error::from),
         "-t" | "--targets" => {
             core::executors::load_default()?
                 .list_targets()
@@ -232,6 +237,7 @@ fn execute(args: Vec<String>) -> Result {
         .find(&args[0])
         .ok_or_else(|| Error::UnknownTarget)?
         .execute(&extract_query(args, 1)?)
+        .map_err(Error::from)
 }
 
 fn run() -> Result {

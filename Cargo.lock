@@ -464,7 +464,6 @@ dependencies = [
 name = "vai"
 version = "0.1.0"
 dependencies = [
- "dirs",
  "vai-core",
 ]
 

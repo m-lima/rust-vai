@@ -1,3 +1,4 @@
+use super::error;
 use super::Result;
 
 use serde::{Deserialize, Serialize};
@@ -67,9 +68,12 @@ impl DuckPhrase {
 
 pub fn parse(parser: &Parser, result: &str) -> Result<Vec<String>> {
     match parser {
-        Parser::GOOGLE => Ok(serde_json::from_str::<Google>(result)?.0),
+        Parser::GOOGLE => Ok(serde_json::from_str::<Google>(result)
+            .map_err(error::parse)?
+            .0),
         Parser::DUCK => Ok(serde_json::from_str::<Duck>(result)
-            .map(Duck::phrases)?
+            .map(Duck::phrases)
+            .map_err(error::parse)?
             .into_iter()
             .map(DuckPhrase::phrase)
             .collect()),

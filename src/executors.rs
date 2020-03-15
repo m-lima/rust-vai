@@ -1,25 +1,11 @@
+use serde::{Deserialize, Serialize};
+
+use super::error;
 use super::parser;
 use super::Result;
 
-use serde::{Deserialize, Serialize};
-
 const HISTORY_PREFIX: &str = "history_";
 const CONFIG_FILE: &str = "config";
-
-#[derive(Debug, Clone)]
-enum Error {
-    Path,
-    Fetch(u16),
-}
-impl std::error::Error for Error {}
-impl std::fmt::Display for Error {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        match self {
-            Error::Path => write!(fmt, "Could not infer HOME directory"),
-            Error::Fetch(status) => write!(fmt, "Got status code {} from suggest query", status),
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Eq)]
 struct FuzzyMatch(i64, String);
@@ -81,12 +67,12 @@ impl Executor {
                     .join("\n")
             });
         let data = format!("{}\n{}\n", query, history);
-        std::fs::write(&path, data).map_err(std::convert::Into::into)
+        std::fs::write(&path, data).map_err(|_| error::write(path))
     }
 
     pub fn execute(&self, query: &str) -> Result {
         let url = format!("{}{}", &self.command, query);
-        webbrowser::open(url.as_str())?;
+        webbrowser::open(url.as_str()).map_err(|_| error::browser(url))?;
         self.save_history(query)
     }
 
@@ -124,9 +110,9 @@ impl Executor {
         let result = {
             let response = ureq::get(format!("{}{}", self.suggestion, query).as_str()).call();
             if !response.ok() {
-                return Err(Error::Fetch(response.status()).into());
+                return Err(error::fetch(response.status()));
             }
-            response.into_string()?
+            response.into_string().map_err(error::parse)?
         };
 
         parser::parse(&self.parser, &result)
@@ -147,18 +133,23 @@ fn default_path() -> Result<std::path::PathBuf> {
         .map(std::path::PathBuf::from)
         .or_else(|_| match dirs::config_dir() {
             Some(path) => Ok(path.join("vai")),
-            None => Err(Error::Path.into()),
+            None => Err(error::path()),
         })
 }
 
 pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
-    bincode::deserialize(std::fs::read(&path)?.as_slice())
-        .map(Executors)
-        .map_err(std::convert::Into::into)
+    bincode::deserialize(
+        std::fs::read(&path)
+            .map_err(|_| error::read(path))?
+            .as_slice(),
+    )
+    .map(Executors)
+    .map_err(error::deserialize)
 }
 
 pub fn load_from_stdin() -> Result<Executors> {
-    let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())?;
+    let executors: Vec<Executor> =
+        serde_json::from_reader(std::io::stdin()).map_err(error::deserialize)?;
     Ok(Executors(
         executors.into_iter().map(Executor::clean_up_name).collect(),
     ))
@@ -185,14 +176,14 @@ impl Executors {
 
     pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result {
         if let Some(parent) = path.as_ref().parent() {
-            std::fs::create_dir_all(&parent)?;
+            std::fs::create_dir_all(&parent).map_err(|_| error::write(&parent))?;
         }
-        let bytes = bincode::serialize(self.executors())?;
-        std::fs::write(&path, bytes).map_err(std::convert::Into::into)
+        let bytes = bincode::serialize(self.executors()).map_err(error::serialize)?;
+        std::fs::write(&path, bytes).map_err(|_| error::write(&path))
     }
 
     pub fn to_json(&self) -> Result<String> {
-        serde_json::to_string_pretty(&self).map_err(std::convert::Into::into)
+        serde_json::to_string_pretty(&self).map_err(error::serialize)
     }
 
     pub fn find(&self, name: &str) -> Option<&Executor> {
