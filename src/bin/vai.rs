@@ -2,6 +2,8 @@
 #![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
 
+use vai::executors::load_default;
+
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Debug, Clone)]
@@ -16,7 +18,9 @@ enum ErrorType {
 
 #[derive(Debug, Clone)]
 struct VaiError(ErrorType);
+
 impl std::error::Error for VaiError {}
+
 impl std::fmt::Display for VaiError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         write!(
@@ -33,6 +37,79 @@ impl std::fmt::Display for VaiError {
         )
     }
 }
+
+// struct Flag {
+//     short: &'static str,
+//     long: &'static str,
+//     description: &'static str,
+// }
+//
+// impl Flag {
+//     const Help: Flag = Flag {
+//         short: "-h",
+//         long: "--help",
+//         description: "Display usage message",
+//     };
+//
+//     const Write: Flag = Flag {
+//         short: "-w",
+//         long: "--write",
+//         description: "Write saved configuration to stdout",
+//     };
+//
+//     const Read: Flag = Flag {
+//         short: "-r",
+//         long: "--read",
+//         description: "Read configuration from stdin and save",
+//     };
+//
+//     const Template: Flag = Flag {
+//         short: "-t",
+//         long: "--template",
+//         description: "Write template configuration to stdout",
+//     };
+//
+//     const Suggest: Flag = Flag {
+//         short: "-s",
+//         long: "--suggest",
+//         description: "Prints a list of suggestions for the given input",
+//     };
+//
+//     fn parse(arg: &str) -> Option<Self> {
+//         match arg {
+//             "-h" | "--help" => Some(Flag::Help),
+//             "-r" | "--read" => Some(Flag::Read),
+//             "-w" | "--write" => Some(Flag::Write),
+//             "-t" | "--template" => Some(Flag::Template),
+//             "-s" | "--suggest" => Some(Flag::Suggest),
+//             _ => None,
+//         }
+//     }
+// }
+
+// enum Flag {
+//     Help,
+//     Write,
+//     Read,
+//     Template,
+//     Suggest,
+//     Unknown,
+// }
+
+// impl std::convert::From<&str> for Flag {
+//
+// impl std::convert::From<&str> for Flag {
+//     fn from(input: &str) -> Flag {
+//         match input {
+//             "-h" | "--help" => Flag::Help,
+//             "-r" | "--read" => Flag::Read,
+//             "-w" | "--write" => Flag::Write,
+//             "-t" | "--template" => Flag::Template,
+//             "-s" | "--suggest" => Flag::Suggest,
+//             _ => Flag::Unknown,
+//         }
+//     }
+// }
 
 #[inline]
 fn new_error<T>(error: ErrorType) -> Result<T> {
@@ -65,20 +142,71 @@ impl FirstCharacter for Vec<String> {
     }
 }
 
+fn application_name() -> String {
+    (|| {
+        std::env::current_exe()
+            .ok()?
+            .file_name()?
+            .to_str()
+            .map(String::from)
+    })()
+    .unwrap_or(String::from(env!("CARGO_PKG_NAME")))
+}
+
+fn print_usage() -> ! {
+    let name = application_name();
+
+    println!("Usage:          {} [target] [query]", name);
+    println!("                {} [option]", name);
+    println!();
+    println!("Arguments:");
+    print!("target          Which target to query");
+
+    match load_default() {
+        Ok(executors) => {
+            print!(" [ ");
+            for executor in executors.list_targets() {
+                print!("{} ", executor);
+            }
+            println!("]");
+        },
+        Err(_) => println!(),
+    }
+
+    println!("query           Query string for <target>");
+    println!();
+    println!("Options:");
+    println!("-r, --read      Read configuration from stdin and save");
+    println!("-w, --write     Write saved configuration to stdout");
+    println!("-t, --template  Write template configuration to stdout");
+    println!("-s, --suggest   Prints a list of suggestions for the given input");
+    println!("-h, --help      Display this help message");
+    println!();
+    println!("Configuration file is stored at:");
+    println!("$VAI_CONFIG (if defined)");
+
+    if let Some(path) = dirs::config_dir() {
+        println!("{}", path.join("vai").display());
+    }
+
+    std::process::exit(0);
+}
+
 fn support(args: Vec<String>) -> Result {
     match args[0].as_str() {
-        "-r" => vai::executors::load_from_stdin()?.save_default(),
-        "-w" => vai::executors::load_default()?
+        "-h" | "--help" => print_usage(),
+        "-r" | "--read" => vai::executors::load_from_stdin()?.save_default(),
+        "-w" | "--write" => vai::executors::load_default()?
             .to_json()
             .map(|json| println!("{}", json)),
-        "-t" => {
+        "-t" | "--template" => {
             vai::executors::load_default()?
                 .list_targets()
                 .into_iter()
                 .for_each(|target| println!("{}", target));
             Ok(())
         }
-        "-s" => {
+        "-s" | "--suggest" => {
             if args.len() < 2 {
                 new_error(ErrorType::NoTarget)
             } else {

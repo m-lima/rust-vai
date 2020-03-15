@@ -83,7 +83,7 @@ mod tests {
 
     #[test]
     fn test_google_parsing() {
-        let result =  r#"["bla",["bladet","blake shelton","black","black panther","blake lively","black mirror","blank","bladkongen","blade runner","blacklist"]]"#;
+        let result = r#"["bla",["bladet","blake shelton","black","black panther","blake lively","black mirror","blank","bladkongen","blade runner","blacklist"]]"#;
         let suggestions = parse(&Parser::GOOGLE, result).unwrap();
         assert_eq!(suggestions.len(), 10);
         assert_eq!(suggestions[0], "bladet");
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn test_duck_parsing() {
-        let result =  r#"[{"phrase":"gopher football"},{"phrase":"gopher"},{"phrase":"gophersports.com"},{"phrase":"gopher football schedule"},{"phrase":"gopher sports"},{"phrase":"gopher 5 winning numbers"},{"phrase":"gopher football score"},{"phrase":"gopher snake"},{"phrase":"gopher hockey"},{"phrase":"gopher volleyball"}]"#;
+        let result = r#"[{"phrase":"gopher football"},{"phrase":"gopher"},{"phrase":"gophersports.com"},{"phrase":"gopher football schedule"},{"phrase":"gopher sports"},{"phrase":"gopher 5 winning numbers"},{"phrase":"gopher football score"},{"phrase":"gopher snake"},{"phrase":"gopher hockey"},{"phrase":"gopher volleyball"}]"#;
         let suggestions = parse(&Parser::DUCK, result).unwrap();
         assert_eq!(suggestions.len(), 10);
         assert_eq!(suggestions[0], "gopher football");
