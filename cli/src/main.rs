@@ -162,7 +162,7 @@ fn print_usage() -> ! {
                 print!("{} ", executor);
             }
             println!("]");
-        },
+        }
         Err(_) => println!(),
     }
 
@@ -204,9 +204,7 @@ fn support(args: Vec<String>) -> Result {
                 new_error(Error::NoTarget)
             } else {
                 let executors = core::executors::load_default()?;
-                let target = executors
-                    .find(&args[1])
-                    .ok_or(Error::UnknownTarget)?;
+                let target = executors.find(&args[1]).ok_or(Error::UnknownTarget)?;
                 let query = match extract_query(args, 2) {
                     Ok(query) => query,
                     Err(_) => return Ok(()),
