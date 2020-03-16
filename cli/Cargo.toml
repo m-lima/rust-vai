@@ -15,5 +15,5 @@ short_description = "A query launcher"
 
 [dependencies]
 atty = "0.2"
-colored = "1.9"
+crossterm = "0.16"
 vai-core = { path = ".." }
