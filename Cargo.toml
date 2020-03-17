@@ -3,7 +3,7 @@ name = "vai-core"
 version = "0.1.0"
 authors = ["Marcelo Lima <marcelowind@gmail.com>"]
 edition = "2018"
-description = "A query launcher"
+description = "A browser query launcher"
 
 [workspace]
 members = [
