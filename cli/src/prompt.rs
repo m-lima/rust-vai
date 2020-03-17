@@ -57,7 +57,15 @@ impl Buffer {
                     self.data.remove(self.position);
                 }
             }
-            Action::DeleteBackWord => {}
+            Action::DeleteBackWord => {
+                // if let Some(index) = self.data[0..self.position].rfind(' ') {
+                //     self.data = String::from(&self.data[index..self.data.len()]);
+                //     self.position = index;
+                // } else {
+                //     self.data = String::from(&self.data[self.position..self.data.len()]);
+                //     self.position = 0;
+                // }
+            }
             Action::DeleteForwardWord => {}
             Action::DeleteBackAll => {
                 self.data = String::from(&self.data[self.position..self.data.len()]);
@@ -77,7 +85,13 @@ impl Buffer {
             Action::MoveForward => {
                 self.position += 1;
             }
-            Action::MoveBackWord => {}
+            Action::MoveBackWord => {
+                // if let Some(index) = self.data[0..self.position].rfind(' ') {
+                //     self.position = index;
+                // } else {
+                //     self.position = 0;
+                // }
+            }
             Action::MoveForwardWord => {}
             Action::MoveBackAll => {
                 self.position = 0;
@@ -93,15 +107,13 @@ fn control(e: &crossterm::event::KeyEvent) -> bool {
     e.modifiers == crossterm::event::KeyModifiers::CONTROL
 }
 
-fn alt(e: &crossterm::event::KeyEvent) -> bool {
-    e.modifiers == crossterm::event::KeyModifiers::ALT
-}
-
 fn process_error<M: std::fmt::Display>(message: M) -> ! {
     crossterm::execute!(
         std::io::stdout(),
+        crossterm::style::Print("\n"),
+        crossterm::cursor::MoveToColumn(0),
         crossterm::style::SetForegroundColor(crossterm::style::Color::Red),
-        crossterm::style::Print("\nError: "),
+        crossterm::style::Print("Error: "),
         crossterm::style::ResetColor,
         crossterm::style::Print(message.to_string()),
     );
@@ -119,55 +131,53 @@ fn exit(code: i32) -> ! {
     std::process::exit(code);
 }
 
-fn read_action() -> Action {
+fn read_action(escape: &mut bool) -> Action {
+    let was_escaped = *escape;
+    *escape = false;
+
     match crossterm::event::read() {
         Ok(crossterm::event::Event::Key(e)) => match e.code {
             crossterm::event::KeyCode::Enter => Action::Execute,
             crossterm::event::KeyCode::Tab => Action::Complete,
-            crossterm::event::KeyCode::Backspace => {
-                if alt(&e) {
-                    Action::DeleteBackWord
-                } else {
-                    Action::DeleteBack
-                }
-            }
-            crossterm::event::KeyCode::Delete => {
-                if alt(&e) {
-                    Action::DeleteForwardWord
-                } else {
-                    Action::DeleteForward
-                }
-            }
-            crossterm::event::KeyCode::Right => {
-                if alt(&e) {
-                    Action::MoveForwardWord
-                } else {
-                    Action::MoveForward
-                }
-            }
-            crossterm::event::KeyCode::Left => {
-                if alt(&e) {
-                    Action::MoveBackWord
-                } else {
-                    Action::MoveBack
-                }
-            }
+            crossterm::event::KeyCode::Backspace => Action::DeleteBack,
+            crossterm::event::KeyCode::Delete => Action::DeleteForward,
+            crossterm::event::KeyCode::Right => Action::MoveForward,
+            crossterm::event::KeyCode::Left => Action::MoveBack,
             crossterm::event::KeyCode::Home => Action::MoveBackAll,
             crossterm::event::KeyCode::End => Action::MoveForwardAll,
+            crossterm::event::KeyCode::Esc => {
+                if !was_escaped {
+                    *escape = true;
+                }
+                Action::Noop
+            }
             crossterm::event::KeyCode::Char(c) => {
                 if control(&e) {
                     match c {
                         'm' => Action::Execute,
                         'c' => Action::Cancel,
-                        'f' => Action::MoveForward,
+
                         'b' => Action::MoveBack,
+                        'f' => Action::MoveForward,
                         'a' => Action::MoveBackAll,
                         'e' => Action::MoveForwardAll,
-                        'h' => Action::DeleteBack,
-                        'd' => Action::DeleteForwardAll,
-                        'l' => Action::DeleteBackAll,
-                        'u' => Action::DeleteAll,
+
+                        'j' => Action::DeleteBackWord,
+                        'k' => Action::DeleteForwardWord,
+                        'h' => Action::DeleteBackAll,
+                        'l' => Action::DeleteForwardAll,
                         'w' => Action::DeleteWordAll,
+                        'u' => Action::DeleteAll,
+                        _ => Action::Noop,
+                    }
+                } else if was_escaped {
+                    std::fs::write(
+                        std::path::Path::new("/tmp/vai_output"),
+                        format!("Processsing escaped\n"),
+                    );
+                    match c {
+                        'b' => Action::MoveBackWord,
+                        'f' => Action::MoveForwardWord,
                         _ => Action::Noop,
                     }
                 } else {
@@ -177,6 +187,23 @@ fn read_action() -> Action {
             _ => Action::Noop,
         },
         Ok(_) => Action::Noop,
+        Err(e) => process_error(e),
+    }
+}
+
+fn execute(buffer: Buffer) -> ! {
+    let args = buffer
+        .data
+        .split_whitespace()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    if args.len() < 2 {
+        exit(-1);
+    }
+
+    match super::execute(args) {
+        Ok(()) => exit(0),
         Err(e) => process_error(e),
     }
 }
@@ -196,12 +223,13 @@ pub(super) fn run(name: String) -> ! {
         + 1;
 
     let mut buffer = Buffer::new();
+    let mut escape = false;
 
     crossterm::terminal::enable_raw_mode();
     loop {
-        match read_action() {
+        match read_action(&mut escape) {
             Action::Noop => continue,
-            Action::Execute => {}
+            Action::Execute => execute(buffer),
             Action::Cancel => exit(0),
             Action::Complete => {}
             action => buffer.process_action(&action),

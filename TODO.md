@@ -12,11 +12,15 @@
   [ ] Make flags enum
   [ ] Better error reporting
   
+## Prompt
+  [ ] Cater for `target word "  word2   "`
+  [ ] Support unicode
+  
 ## UI
   [ ] Make UI
   
 ## Util
-  [ ] Reorganize
+  [X] Reorganize
 ```
 vai
  |_ core (lib)

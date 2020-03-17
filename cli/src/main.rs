@@ -167,7 +167,7 @@ fn support(args: Vec<String>) -> Result {
     }
 }
 
-fn execute(args: Vec<String>) -> Result {
+pub(crate) fn execute(args: Vec<String>) -> Result {
     core::executors::load_default()?
         .find(&args[0])
         .ok_or_else(|| Error::UnknownTarget)?
