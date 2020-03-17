@@ -36,6 +36,11 @@ impl PartialOrd for FuzzyMatch {
     }
 }
 
+/// Represents a target for querying
+///
+/// Must contain a URL to be called by the browser
+///
+/// May contain a URL for querying for suggestions, along with it parser
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executor {
     name: String,
@@ -70,12 +75,31 @@ impl Executor {
         std::fs::write(&path, data).map_err(|_| error::write(path))
     }
 
+    /// Executes the query by calling the default browser
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query string to to execute on `target`
+    ///
+    /// # Errors
+    ///
+    /// * If `webbrowser::open(&str)` fails, then [`Error(Browser)`](../error/struct.Error.html)
+    /// * If the history cannot be saved, then [`Error(Write)`](../error/struct.Error.html)
     pub fn execute(&self, query: &str) -> Result {
         let url = format!("{}{}", &self.command, query);
         webbrowser::open(url.as_str()).map_err(|_| error::browser(url))?;
         self.save_history(query)
     }
 
+    /// Suggest up to 10 queries based on fuzzy matching of the history
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query string to to get historic completions for
+    ///
+    /// # Errors
+    ///
+    /// * If the path for the history cannot be created, then [`Error(Path)`](../error/struct.Error.html)
     pub fn complete(&self, query: &str) -> Result<Vec<String>> {
         use std::io::BufRead;
 
@@ -102,6 +126,16 @@ impl Executor {
             .or_else(|_| Ok(vec![]))
     }
 
+    /// Queries the suggestion API for this executor for suggestions
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query string to to get suggestions for
+    ///
+    /// # Errors
+    ///
+    /// * If response is not 200 OK, then [`Error(Fetch)`](../error/struct.Error.html)
+    /// * If response cannot be parsed, then [`Error(Parse)`](../error/struct.Error.html)
     pub fn suggest(&self, query: &str) -> Result<Vec<String>> {
         if query.len() < 3 || self.suggestion.is_empty() || self.parser == parser::Parser::NONE {
             return Ok(vec![]);
@@ -119,9 +153,26 @@ impl Executor {
     }
 }
 
+/// Contains all [targets](struct.Executor.html) known
+///
+/// This is the representation of the configuration that gets serialized and deserialized
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executors(Vec<Executor>);
 
+/// Loads a instance of [`Executors`](struct.Executors.html) based on `path`
+///
+/// # Arguments
+///
+/// * `path` - Path from where to load [`Executors`](struct.Executors.html)
+///
+/// # Errors
+///
+/// * If the path for the configuration cannot be created, then [`Error(Path)`](../error/struct.Error.html)
+/// * If default path cannot be read, then [`Error(Read)`](../error/struct.Error.html)
+/// * If the configuration cannot be deserialized, then [`Error(Deserialize)`](../error/struct.Error.html)
+///
+/// # See also
+/// [`load_default()`](fn.load_default.html)
 pub fn load_default() -> Result<Executors> {
     default_path()
         .map(|path| path.join(CONFIG_FILE))
@@ -137,6 +188,19 @@ fn default_path() -> Result<std::path::PathBuf> {
         })
 }
 
+/// Loads a instance of [`Executors`](struct.Executors.html) based on `path`
+///
+/// # Arguments
+///
+/// * `path` - Path from where to load [`Executors`](struct.Executors.html)
+///
+/// # Errors
+///
+/// * If `path` cannot be read, then [`Error(Read)`](../error/struct.Error.html)
+/// * If the configuration cannot be deserialized, then [`Error(Deserialize)`](../error/struct.Error.html)
+///
+/// # See also
+/// [`load_default()`](fn.load_default.html)
 pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
     bincode::deserialize(
         std::fs::read(&path)
@@ -147,6 +211,14 @@ pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
     .map_err(error::deserialize)
 }
 
+/// Creates a new [`Executors`](struct.Executors.html) based on the json provided through `std::io::stdin`
+///
+/// This is useful for generating new configuration by json by calling `load_from_stdin()` followed
+/// by [`Executors::save_default()`](struct.Executors.html#method.save_default)
+///
+/// # Errors
+///
+/// If the json provided cannot be deserialized, then [`Error(Deserialize)`](../error/struct.Error.html)
 pub fn load_from_stdin() -> Result<Executors> {
     let executors: Vec<Executor> =
         serde_json::from_reader(std::io::stdin()).map_err(error::deserialize)?;
@@ -161,6 +233,8 @@ impl Executors {
         &self.0
     }
 
+    /// Returns all the [`targets`](struct.Executor.html) for querying
+    #[must_use]
     pub fn list_targets(&self) -> Vec<&String> {
         self.executors()
             .iter()
@@ -168,12 +242,36 @@ impl Executors {
             .collect()
     }
 
+    /// Saves this `Executor` to disk in the default path
+    ///
+    /// # Errors
+    ///
+    /// * If the path for the configuration cannot be created, then [`Error(Path)`](../error/struct.Error.html)
+    /// * If default path cannot be written, then [`Error(Write)`](../error/struct.Error.html)
+    /// * If the configuration cannot be serialized, then [`Error(Serialize)`](../error/struct.Error.html)
+    ///
+    /// # See also
+    /// [`save(path)`](#method.save)
     pub fn save_default(&self) -> Result {
         default_path()
             .map(|path| path.join(CONFIG_FILE))
             .and_then(|path| self.save(path))
     }
 
+    /// Saves this `Executor` to disk in the default path
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path where to save [`Executors`](struct.Executors.html)
+    ///
+    /// # Errors
+    ///
+    /// * If the path for the configuration cannot be created, then [`Error(Path)`](../error/struct.Error.html)
+    /// * If default path cannot be written, then [`Error(Write)`](../error/struct.Error.html)
+    /// * If the configuration cannot be serialized, then [`Error(Serialize)`](../error/struct.Error.html)
+    ///
+    /// # See also
+    /// [`save(path)`](#method.save_default)
     pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result {
         if let Some(parent) = path.as_ref().parent() {
             std::fs::create_dir_all(&parent).map_err(|_| error::write(&parent))?;
@@ -182,10 +280,21 @@ impl Executors {
         std::fs::write(&path, bytes).map_err(|_| error::write(&path))
     }
 
+    /// Output this `Executor` as a json representation
+    ///
+    /// # Errors
+    ///
+    /// * If the configuration cannot be serialized, then [`Error(Serialize)`](../error/struct.Error.html)
     pub fn to_json(&self) -> Result<String> {
         serde_json::to_string_pretty(&self).map_err(error::serialize)
     }
 
+    /// Get the target that matches the provided `name`
+    ///
+    /// # Arguments
+    ///
+    /// `name` - Name of the [`target`](struct.Executor.html) to be returned
+    #[must_use]
     pub fn find(&self, name: &str) -> Option<&Executor> {
         let lower_case_name = name.to_lowercase();
         for executor in self.executors() {

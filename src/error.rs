@@ -1,3 +1,14 @@
+/// Error for all operations in this library
+///
+/// Possible kinds:
+/// * Path
+/// * Fecth
+/// * Write
+/// * Read
+/// * Serialize
+/// * Deserialize
+/// * Parse
+/// * Browser
 #[derive(Debug, Clone)]
 pub struct Error {
     kind: Kind,
@@ -38,38 +49,46 @@ impl std::fmt::Display for Error {
     }
 }
 
-pub fn path() -> Error {
+#[must_use]
+pub(crate) fn path() -> Error {
     Error::new(Kind::Path)
 }
 
-pub fn fetch(status: u16) -> Error {
+#[must_use]
+pub(crate) fn fetch(status: u16) -> Error {
     Error::new(Kind::Fetch(status))
 }
 
-pub fn write<P: AsRef<std::path::Path>>(path: P) -> Error {
+#[must_use]
+pub(crate) fn write<P: AsRef<std::path::Path>>(path: P) -> Error {
     Error::new(Kind::Write(String::from(
         path.as_ref().to_str().unwrap_or("NULL"),
     )))
 }
 
-pub fn read<P: AsRef<std::path::Path>>(path: P) -> Error {
+#[must_use]
+pub(crate) fn read<P: AsRef<std::path::Path>>(path: P) -> Error {
     Error::new(Kind::Read(String::from(
         path.as_ref().to_str().unwrap_or("NULL"),
     )))
 }
 
-pub fn serialize<E>(_: E) -> Error {
+#[must_use]
+pub(crate) fn serialize<E>(_: E) -> Error {
     Error::new(Kind::Serialize)
 }
 
-pub fn deserialize<E>(_: E) -> Error {
+#[must_use]
+pub(crate) fn deserialize<E>(_: E) -> Error {
     Error::new(Kind::Deserialize)
 }
 
-pub fn parse<E>(_: E) -> Error {
+#[must_use]
+pub(crate) fn parse<E>(_: E) -> Error {
     Error::new(Kind::Parse)
 }
 
-pub fn browser(url: String) -> Error {
+#[must_use]
+pub(crate) fn browser(url: String) -> Error {
     Error::new(Kind::Browser(url))
 }
