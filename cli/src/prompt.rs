@@ -28,19 +28,72 @@ enum Action {
 
 struct Buffer {
     position: usize,
-    data: String,
+    data: Vec<char>,
 }
 
 impl Buffer {
     fn new() -> Self {
         Self {
             position: 0,
-            data: String::new(),
+            data: Vec::new(),
         }
     }
 
-    // Allowed for now, since it's still in development
-    #[allow(clippy::match_same_arms)]
+    fn find_next_word(&self) -> usize {
+        let end = self.data.len();
+        if self.position == end {
+            self.position
+        } else {
+            let mut index = self.position;
+
+            while index < end && !self.data[index].is_whitespace() {
+                index += 1;
+            }
+
+            while index < end && self.data[index].is_whitespace() {
+                index += 1;
+            }
+
+            index
+        }
+    }
+
+    fn find_previous_word(&self) -> usize {
+        if self.position == 0 {
+            self.position
+        } else {
+            let mut index = self.position - 1;
+
+            while index > 0 && self.data[index].is_whitespace() {
+                index -= 1;
+            }
+
+            while index > 0 && !self.data[index - 1].is_whitespace() {
+                index -= 1;
+            }
+
+            index
+        }
+    }
+
+    fn find_previous_word_end(&self) -> usize {
+        if self.position == 0 {
+            self.position
+        } else {
+            let mut index = self.position - 1;
+
+            while index > 0 && !self.data[index].is_whitespace() {
+                index -= 1;
+            }
+
+            while index > 0 && self.data[index - 1].is_whitespace() {
+                index -= 1;
+            }
+
+            index
+        }
+    }
+
     fn process_action(&mut self, action: &Action) {
         match action {
             Action::Execute | Action::Cancel | Action::Complete | Action::Noop => {}
@@ -60,27 +113,32 @@ impl Buffer {
                 }
             }
             Action::DeleteBackWord => {
-                // if let Some(index) = self.data[0..self.position].rfind(' ') {
-                //     self.data = String::from(&self.data[index..self.data.len()]);
-                //     self.position = index;
-                // } else {
-                //     self.data = String::from(&self.data[self.position..self.data.len()]);
-                //     self.position = 0;
-                // }
+                let index = self.find_previous_word();
+                self.data.drain(index..self.position);
+                self.position = index;
             }
-            Action::DeleteForwardWord => {}
+            Action::DeleteForwardWord => {
+                let index = self.find_next_word();
+                self.data.drain(self.position..index);
+            }
             Action::DeleteBackAll => {
-                self.data = String::from(&self.data[self.position..self.data.len()]);
+                self.data.drain(0..self.position);
                 self.position = 0;
             }
             Action::DeleteForwardAll => {
-                self.data = String::from(&self.data[0..self.position]);
+                self.data.drain(self.position..self.data.len());
             }
             Action::DeleteAll => {
-                self.data = String::new();
+                self.data.clear();
                 self.position = 0;
             }
-            Action::DeleteWordAll => {}
+            Action::DeleteWordAll => {
+                let start = self.find_previous_word_end();
+                let end = self.find_next_word();
+                self.data.drain(start + 1..end);
+                self.data[start] = ' ';
+                self.position = start;
+            }
             Action::MoveBack => {
                 self.position -= 1;
             }
@@ -88,13 +146,11 @@ impl Buffer {
                 self.position += 1;
             }
             Action::MoveBackWord => {
-                // if let Some(index) = self.data[0..self.position].rfind(' ') {
-                //     self.position = index;
-                // } else {
-                //     self.position = 0;
-                // }
+                self.position = self.find_previous_word();
             }
-            Action::MoveForwardWord => {}
+            Action::MoveForwardWord => {
+                self.position = self.find_next_word();
+            }
             Action::MoveBackAll => {
                 self.position = 0;
             }
@@ -107,6 +163,10 @@ impl Buffer {
 
 fn control(e: &crossterm::event::KeyEvent) -> bool {
     e.modifiers == crossterm::event::KeyModifiers::CONTROL
+}
+
+fn alt(e: &crossterm::event::KeyEvent) -> bool {
+    e.modifiers == crossterm::event::KeyModifiers::ALT
 }
 
 fn process_error<M: std::fmt::Display>(message: M) -> ! {
@@ -133,10 +193,7 @@ fn exit(code: i32) -> ! {
     std::process::exit(code);
 }
 
-fn read_action(escape: &mut bool) -> Action {
-    let was_escaped = *escape;
-    *escape = false;
-
+fn read_action() -> Action {
     match crossterm::event::read() {
         Ok(crossterm::event::Event::Key(e)) => match e.code {
             crossterm::event::KeyCode::Enter => Action::Execute,
@@ -147,12 +204,6 @@ fn read_action(escape: &mut bool) -> Action {
             crossterm::event::KeyCode::Left => Action::MoveBack,
             crossterm::event::KeyCode::Home => Action::MoveBackAll,
             crossterm::event::KeyCode::End => Action::MoveForwardAll,
-            crossterm::event::KeyCode::Esc => {
-                if !was_escaped {
-                    *escape = true;
-                }
-                Action::Noop
-            }
             crossterm::event::KeyCode::Char(c) => {
                 if control(&e) {
                     match c {
@@ -172,11 +223,7 @@ fn read_action(escape: &mut bool) -> Action {
                         'u' => Action::DeleteAll,
                         _ => Action::Noop,
                     }
-                } else if was_escaped {
-                    std::fs::write(
-                        std::path::Path::new("/tmp/vai_output"),
-                        "Processsing escaped\n",
-                    );
+                } else if alt(&e) {
                     match c {
                         'b' => Action::MoveBackWord,
                         'f' => Action::MoveForwardWord,
@@ -193,9 +240,11 @@ fn read_action(escape: &mut bool) -> Action {
     }
 }
 
-fn execute(buffer: &Buffer) -> ! {
+fn execute(buffer: Buffer) -> ! {
     let args = buffer
         .data
+        .into_iter()
+        .collect::<String>()
         .split_whitespace()
         .map(String::from)
         .collect::<Vec<_>>();
@@ -224,13 +273,13 @@ pub(super) fn run(name: &str) -> ! {
     let start = crossterm::cursor::position().map_or_else(|_| (name.len() + 2) as u16, |p| p.0) + 1;
 
     let mut buffer = Buffer::new();
-    let mut escape = false;
 
     crossterm::terminal::enable_raw_mode();
+
     loop {
-        match read_action(&mut escape) {
+        match read_action() {
             Action::Noop => continue,
-            Action::Execute => execute(&buffer),
+            Action::Execute => execute(buffer),
             Action::Cancel => exit(0),
             Action::Complete => {}
             action => buffer.process_action(&action),
@@ -242,7 +291,7 @@ pub(super) fn run(name: &str) -> ! {
             std::io::stdout(),
             crossterm::cursor::MoveToColumn(start),
             crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine),
-            crossterm::style::Print(&buffer.data),
+            crossterm::style::Print(&buffer.data.iter().collect::<String>()),
             crossterm::cursor::MoveToColumn(cursor),
         );
     }
