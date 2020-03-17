@@ -286,12 +286,13 @@ pub(super) fn run(name: &str) -> ! {
         }
 
         let cursor = start + buffer.position as u16;
+        let buffer_string = buffer.data.iter().collect::<String>();
 
         crossterm::execute!(
             std::io::stdout(),
             crossterm::cursor::MoveToColumn(start),
             crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine),
-            crossterm::style::Print(&buffer.data.iter().collect::<String>()),
+            crossterm::style::Print(buffer_string),
             crossterm::cursor::MoveToColumn(cursor),
         );
     }

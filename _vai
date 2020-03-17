@@ -12,8 +12,8 @@ then
   _describe 'targets' completions
 
   local options=(
-  '-w:Write configuration as JSON'
-  '-r:Load configuration from JSON'
+  '-w:Write configuration as stdout JSON'
+  '-r:Read configuration from stdin JSON'
   '-t:Print known targets'
   '-s:Show suggestions'
   )

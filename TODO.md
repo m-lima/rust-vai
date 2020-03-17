@@ -15,6 +15,8 @@
 ## Prompt
   [ ] Cater for `target word "  word2   "`
   [X] Support unicode
+  [ ] Add completion support
+  [ ] Add suggestion support
   
 ## UI
   [ ] Make UI
