@@ -63,7 +63,7 @@ fn application_name() -> String {
             .to_str()
             .map(String::from)
     })()
-    .unwrap_or(String::from(env!("CARGO_PKG_NAME")))
+    .unwrap_or_else(|| String::from(env!("CARGO_PKG_NAME")))
 }
 
 fn print_usage() -> Result {
@@ -126,44 +126,41 @@ fn support(args: Vec<String>) -> Result {
                 print_targets()
             } else {
                 let executors = core::executors::load_default()?;
-                match executors.find(&args[1]) {
-                    Some(target) => {
-                        let query = match extract_query(args, 2) {
-                            Ok(query) => query,
-                            Err(_) => return Ok(()),
-                        };
+                if let Some(target) = executors.find(&args[1]) {
+                    let query = match extract_query(args, 2) {
+                        Ok(query) => query,
+                        Err(_) => return Ok(()),
+                    };
 
-                        target
-                            .suggest(&query)
-                            .unwrap_or_else(|_| vec![])
-                            .into_iter()
-                            .for_each(|entry| println!("{}", entry));
-                        target
-                            .complete(&query)
-                            .unwrap_or_else(|_| vec![])
-                            .into_iter()
-                            .for_each(|entry| println!("{}", entry));
-                        Ok(())
-                    }
-                    None => {
-                        let possible_targets = executors
-                            .list_targets()
-                            .into_iter()
-                            .filter(|target| target.starts_with(&args[1]))
-                            .collect::<Vec<_>>();
-                        if possible_targets.is_empty() {
-                            Err(Error::UnknownTarget)
-                        } else {
-                            for possible_target in possible_targets {
-                                println!("{}", possible_target);
-                            }
-                            Ok(())
+                    target
+                        .suggest(&query)
+                        .unwrap_or_else(|_| vec![])
+                        .into_iter()
+                        .for_each(|entry| println!("{}", entry));
+                    target
+                        .complete(&query)
+                        .unwrap_or_else(|_| vec![])
+                        .into_iter()
+                        .for_each(|entry| println!("{}", entry));
+                    Ok(())
+                } else {
+                    let possible_targets = executors
+                        .list_targets()
+                        .into_iter()
+                        .filter(|target| target.starts_with(&args[1]))
+                        .collect::<Vec<_>>();
+                    if possible_targets.is_empty() {
+                        Err(Error::UnknownTarget)
+                    } else {
+                        for possible_target in possible_targets {
+                            println!("{}", possible_target);
                         }
+                        Ok(())
                     }
                 }
             }
         }
-        flag::Flag::Unknown(command) => Err(Error::UnknownCommand(String::from(command))),
+        flag::Flag::Unknown(command) => Err(Error::UnknownCommand(command)),
     }
 }
 
@@ -195,7 +192,7 @@ fn main() {
     match select_mode(std::env::args()) {
         Mode::Interactive => {
             if atty::is(atty::Stream::Stdout) {
-                prompt::run(application_name())
+                prompt::run(&application_name())
             } else {
                 unimplemented!("No GUI yet");
             }

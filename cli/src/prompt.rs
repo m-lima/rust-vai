@@ -39,6 +39,8 @@ impl Buffer {
         }
     }
 
+    // Allowed for now, since it's still in development
+    #[allow(clippy::match_same_arms)]
     fn process_action(&mut self, action: &Action) {
         match action {
             Action::Execute | Action::Cancel | Action::Complete | Action::Noop => {}
@@ -173,7 +175,7 @@ fn read_action(escape: &mut bool) -> Action {
                 } else if was_escaped {
                     std::fs::write(
                         std::path::Path::new("/tmp/vai_output"),
-                        format!("Processsing escaped\n"),
+                        "Processsing escaped\n",
                     );
                     match c {
                         'b' => Action::MoveBackWord,
@@ -191,7 +193,7 @@ fn read_action(escape: &mut bool) -> Action {
     }
 }
 
-fn execute(buffer: Buffer) -> ! {
+fn execute(buffer: &Buffer) -> ! {
     let args = buffer
         .data
         .split_whitespace()
@@ -208,7 +210,9 @@ fn execute(buffer: Buffer) -> ! {
     }
 }
 
-pub(super) fn run(name: String) -> ! {
+// Allowed while still in development. String might not be used after all
+#[allow(clippy::cast_possible_truncation)]
+pub(super) fn run(name: &str) -> ! {
     crossterm::execute!(
         std::io::stdout(),
         crossterm::style::SetForegroundColor(crossterm::style::Color::Blue),
@@ -217,10 +221,7 @@ pub(super) fn run(name: String) -> ! {
         crossterm::style::Print("> "),
     );
 
-    let start = crossterm::cursor::position()
-        .map(|p| p.0)
-        .unwrap_or_else(|_| (name.len() + 2) as u16)
-        + 1;
+    let start = crossterm::cursor::position().map_or_else(|_| (name.len() + 2) as u16, |p| p.0) + 1;
 
     let mut buffer = Buffer::new();
     let mut escape = false;
@@ -229,7 +230,7 @@ pub(super) fn run(name: String) -> ! {
     loop {
         match read_action(&mut escape) {
             Action::Noop => continue,
-            Action::Execute => execute(buffer),
+            Action::Execute => execute(&buffer),
             Action::Cancel => exit(0),
             Action::Complete => {}
             action => buffer.process_action(&action),
