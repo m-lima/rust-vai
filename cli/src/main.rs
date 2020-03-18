@@ -59,7 +59,7 @@ fn application_name() -> String {
     (|| {
         std::env::current_exe()
             .ok()?
-            .file_name()?
+            .file_stem()?
             .to_str()
             .map(String::from)
     })()
@@ -69,8 +69,9 @@ fn application_name() -> String {
 fn print_usage() -> Result {
     let name = application_name();
 
-    println!("Usage:          {} [target] [query]", name);
-    println!("                {} [option]", name);
+    println!("Usage:          {} <target> <query>", name);
+    println!("                {} <option>", name);
+    println!("                {}", name);
     println!();
     println!("Arguments:");
     print!("target          Which target to query");
@@ -98,6 +99,8 @@ fn print_usage() -> Result {
             flag.description()
         );
     }
+    println!();
+    println!("If no parameters are provided, the prompt user interface will be invoked");
 
     Ok(())
 }
