@@ -2,6 +2,8 @@
 
 use std::io::Write;
 
+static PROMPT_START: u16 = 6;
+
 enum Action {
     Execute,
     Cancel,
@@ -37,6 +39,12 @@ impl Buffer {
             position: 0,
             data: Vec::new(),
         }
+    }
+
+    // Allowed because it is guarded in the `write` method
+    #[allow(clippy::cast_possible_truncation)]
+    fn position(&self) -> u16 {
+        self.position as u16
     }
 
     fn find_next_word(&self) -> usize {
@@ -98,8 +106,10 @@ impl Buffer {
         match action {
             Action::Execute | Action::Cancel | Action::Complete | Action::Noop => {}
             Action::Write(c) => {
-                self.data.insert(self.position, *c);
-                self.position += 1;
+                if self.data.len() < usize::from(u16::max_value() - PROMPT_START) {
+                    self.data.insert(self.position, *c);
+                    self.position += 1;
+                }
             }
             Action::DeleteBack => {
                 if self.position > 0 {
@@ -259,18 +269,14 @@ fn execute(buffer: Buffer) -> ! {
     }
 }
 
-// Allowed while still in development. String might not be used after all
-#[allow(clippy::cast_possible_truncation)]
-pub(super) fn run(name: &str) -> ! {
+pub(super) fn run() -> ! {
     crossterm::execute!(
         std::io::stdout(),
         crossterm::style::SetForegroundColor(crossterm::style::Color::Blue),
-        crossterm::style::Print(&name),
+        crossterm::style::Print("vai"),
         crossterm::style::ResetColor,
         crossterm::style::Print("> "),
     );
-
-    let start = crossterm::cursor::position().map_or_else(|_| (name.len() + 2) as u16, |p| p.0) + 1;
 
     let mut buffer = Buffer::new();
 
@@ -285,12 +291,12 @@ pub(super) fn run(name: &str) -> ! {
             action => buffer.process_action(&action),
         }
 
-        let cursor = start + buffer.position as u16;
+        let cursor = PROMPT_START + buffer.position();
         let buffer_string = buffer.data.iter().collect::<String>();
 
         crossterm::execute!(
             std::io::stdout(),
-            crossterm::cursor::MoveToColumn(start),
+            crossterm::cursor::MoveToColumn(PROMPT_START),
             crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine),
             crossterm::style::Print(buffer_string),
             crossterm::cursor::MoveToColumn(cursor),

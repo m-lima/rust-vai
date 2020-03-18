@@ -195,7 +195,7 @@ fn main() {
     match select_mode(std::env::args()) {
         Mode::Interactive => {
             if atty::is(atty::Stream::Stdout) {
-                prompt::run(&application_name())
+                prompt::run()
             } else {
                 unimplemented!("No GUI yet");
             }
