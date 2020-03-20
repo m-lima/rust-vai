@@ -7,27 +7,28 @@ use std::io::Write;
 static PROMPT_START: u16 = 6;
 
 enum Action {
+    Edit(EditAction),
+    MoveCursor(Scope),
     Execute,
     Cancel,
     Complete,
-    Write(char),
     Noop,
+}
 
-    DeleteBack,
-    DeleteForward,
-    DeleteBackWord,
-    DeleteForwardWord,
-    DeleteBackAll,
-    DeleteForwardAll,
-    DeleteAll,
-    DeleteWordAll,
+enum EditAction {
+    Write(char),
+    Delete(Scope),
+}
 
-    MoveBack,
-    MoveForward,
-    MoveBackWord,
-    MoveForwardWord,
-    MoveBackAll,
-    MoveForwardAll,
+enum Scope {
+    Back,
+    Forward,
+    BackWord,
+    ForwardWord,
+    BackAll,
+    ForwardAll,
+    All,
+    WordAll,
 }
 
 struct Suggester<'a> {
@@ -148,52 +149,64 @@ impl<'a> Buffer<'a> {
         }
     }
 
-    fn process_action(&mut self, action: &Action) {
-        match action {
-            Action::Execute | Action::Cancel | Action::Complete | Action::Noop => {}
-            Action::Write(c) => self.write(*c),
-            Action::DeleteBack => {
+    fn delete(&mut self, scope: &Scope) {
+        match scope {
+            Scope::Back => {
                 if self.position > 0 {
                     self.data.remove(self.position - 1);
                     self.position -= 1;
                 }
             }
-            Action::DeleteForward => {
+            Scope::Forward => {
                 if self.position < self.data.len() {
                     self.data.remove(self.position);
                 }
             }
-            Action::DeleteBackWord => {
+            Scope::BackWord => {
                 let index = self.find_previous_word();
                 self.data.drain(index..self.position);
                 self.position = index;
             }
-            Action::DeleteForwardWord => {
+            Scope::ForwardWord => {
                 let index = self.find_next_word();
                 self.data.drain(self.position..index);
             }
-            Action::DeleteBackAll => {
+            Scope::BackAll => {
                 self.data.drain(0..self.position);
                 self.position = 0;
             }
-            Action::DeleteForwardAll => {
+            Scope::ForwardAll => {
                 self.data.drain(self.position..self.data.len());
             }
-            Action::DeleteAll => {
+            Scope::All => {
                 self.data.clear();
                 self.position = 0;
             }
-            Action::DeleteWordAll => {
+            Scope::WordAll => {
                 let start = self.find_previous_word_end();
                 let end = self.find_next_word();
                 self.data.drain(start + 1..end);
                 self.data[start] = ' ';
                 self.position = start;
             }
-            Action::MoveBack => {
+        }
+    }
+
+    fn edit(&mut self, action: &EditAction) {
+        match action {
+            EditAction::Write(c) => self.write(*c),
+            EditAction::Delete(scope) => self.delete(scope),
+        }
+
+        self.generate_suggestion();
+    }
+
+    fn move_cursor(&mut self, scope: &Scope) {
+        match scope {
+            Scope::Back => {
                 self.position -= 1;
             }
-            Action::MoveForward => {
+            Scope::Forward => {
                 if self.position < self.data.len() {
                     self.position += 1;
                 } else {
@@ -202,21 +215,20 @@ impl<'a> Buffer<'a> {
                     suggestion.chars().for_each(|c| self.write(c));
                 }
             }
-            Action::MoveBackWord => {
+            Scope::BackWord => {
                 self.position = self.find_previous_word();
             }
-            Action::MoveForwardWord => {
+            Scope::ForwardWord => {
                 self.position = self.find_next_word();
             }
-            Action::MoveBackAll => {
+            Scope::BackAll => {
                 self.position = 0;
             }
-            Action::MoveForwardAll => {
+            Scope::ForwardAll => {
                 self.position = self.data.len();
             }
+            Scope::WordAll | Scope::All => unreachable!("No available cursor movements for these"),
         }
-
-        self.generate_suggestion();
     }
 }
 
@@ -257,39 +269,39 @@ fn read_action() -> Action {
         Ok(crossterm::event::Event::Key(e)) => match e.code {
             crossterm::event::KeyCode::Enter => Action::Execute,
             crossterm::event::KeyCode::Tab => Action::Complete,
-            crossterm::event::KeyCode::Backspace => Action::DeleteBack,
-            crossterm::event::KeyCode::Delete => Action::DeleteForward,
-            crossterm::event::KeyCode::Right => Action::MoveForward,
-            crossterm::event::KeyCode::Left => Action::MoveBack,
-            crossterm::event::KeyCode::Home => Action::MoveBackAll,
-            crossterm::event::KeyCode::End => Action::MoveForwardAll,
+            crossterm::event::KeyCode::Backspace => Action::Edit(EditAction::Delete(Scope::Back)),
+            crossterm::event::KeyCode::Delete => Action::Edit(EditAction::Delete(Scope::Forward)),
+            crossterm::event::KeyCode::Right => Action::MoveCursor(Scope::Forward),
+            crossterm::event::KeyCode::Left => Action::MoveCursor(Scope::Back),
+            crossterm::event::KeyCode::Home => Action::MoveCursor(Scope::BackAll),
+            crossterm::event::KeyCode::End => Action::MoveCursor(Scope::ForwardAll),
             crossterm::event::KeyCode::Char(c) => {
                 if control(&e) {
                     match c {
                         'm' => Action::Execute,
                         'c' => Action::Cancel,
 
-                        'b' => Action::MoveBack,
-                        'f' => Action::MoveForward,
-                        'a' => Action::MoveBackAll,
-                        'e' => Action::MoveForwardAll,
+                        'b' => Action::MoveCursor(Scope::Back),
+                        'f' => Action::MoveCursor(Scope::Forward),
+                        'a' => Action::MoveCursor(Scope::BackAll),
+                        'e' => Action::MoveCursor(Scope::ForwardAll),
 
-                        'j' => Action::DeleteBackWord,
-                        'k' => Action::DeleteForwardWord,
-                        'h' => Action::DeleteBackAll,
-                        'l' => Action::DeleteForwardAll,
-                        'w' => Action::DeleteWordAll,
-                        'u' => Action::DeleteAll,
+                        'j' => Action::Edit(EditAction::Delete(Scope::BackWord)),
+                        'k' => Action::Edit(EditAction::Delete(Scope::ForwardWord)),
+                        'h' => Action::Edit(EditAction::Delete(Scope::BackAll)),
+                        'l' => Action::Edit(EditAction::Delete(Scope::ForwardAll)),
+                        'w' => Action::Edit(EditAction::Delete(Scope::WordAll)),
+                        'u' => Action::Edit(EditAction::Delete(Scope::All)),
                         _ => Action::Noop,
                     }
                 } else if alt(&e) {
                     match c {
-                        'b' => Action::MoveBackWord,
-                        'f' => Action::MoveForwardWord,
+                        'b' => Action::MoveCursor(Scope::BackWord),
+                        'f' => Action::MoveCursor(Scope::ForwardWord),
                         _ => Action::Noop,
                     }
                 } else {
-                    Action::Write(c)
+                    Action::Edit(EditAction::Write(c))
                 }
             }
             _ => Action::Noop,
@@ -344,7 +356,8 @@ pub(super) fn run() -> ! {
             Action::Execute => execute(buffer),
             Action::Cancel => exit(0),
             Action::Complete => complete(),
-            action => buffer.process_action(&action),
+            Action::Edit(action) => buffer.edit(&action),
+            Action::MoveCursor(scope) => buffer.move_cursor(&scope),
         }
 
         let cursor = PROMPT_START + buffer.position();
