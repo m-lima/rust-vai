@@ -1,5 +1,7 @@
 #![allow(unused_must_use)]
 
+use vai_core as core;
+
 use std::io::Write;
 
 static PROMPT_START: u16 = 6;
@@ -28,16 +30,28 @@ enum Action {
     MoveForwardAll,
 }
 
-struct Buffer {
-    position: usize,
-    data: Vec<char>,
+struct Suggester<'a> {
+    targets: Vec<&'a String>,
+    data: String,
+    last_size: usize,
 }
 
-impl Buffer {
-    fn new() -> Self {
+struct Buffer<'a> {
+    position: usize,
+    data: Vec<char>,
+    suggestion: Suggester<'a>,
+}
+
+impl<'a> Buffer<'a> {
+    fn new(executors: &'a core::executors::Executors) -> Self {
         Self {
             position: 0,
             data: Vec::new(),
+            suggestion: Suggester {
+                targets: executors.list_targets(),
+                data: String::new(),
+                last_size: 0,
+            },
         }
     }
 
@@ -102,15 +116,42 @@ impl Buffer {
         }
     }
 
+    fn generate_suggestion(&mut self) {
+        if self.position != self.data.len()
+            || self.position == 0
+            || self.data[self.position - 1].is_whitespace()
+            || self.suggestion.last_size == self.data.len()
+        {
+            return;
+        }
+
+        let start = self.find_previous_word();
+        let last_word = self.data[start..self.position].iter().collect::<String>();
+        self.suggestion.last_size = self.data.len();
+
+        if let Some(suggestion) = self
+            .suggestion
+            .targets
+            .iter()
+            .find(|target| target.starts_with(&last_word))
+        {
+            self.suggestion.data = String::from(&suggestion[last_word.len()..suggestion.len()]);
+        } else {
+            self.suggestion.data.clear();
+        }
+    }
+
+    fn write(&mut self, c: char) {
+        if self.data.len() < usize::from(u16::max_value() - PROMPT_START) {
+            self.data.insert(self.position, c);
+            self.position += 1;
+        }
+    }
+
     fn process_action(&mut self, action: &Action) {
         match action {
             Action::Execute | Action::Cancel | Action::Complete | Action::Noop => {}
-            Action::Write(c) => {
-                if self.data.len() < usize::from(u16::max_value() - PROMPT_START) {
-                    self.data.insert(self.position, *c);
-                    self.position += 1;
-                }
-            }
+            Action::Write(c) => self.write(*c),
             Action::DeleteBack => {
                 if self.position > 0 {
                     self.data.remove(self.position - 1);
@@ -153,7 +194,13 @@ impl Buffer {
                 self.position -= 1;
             }
             Action::MoveForward => {
-                self.position += 1;
+                if self.position < self.data.len() {
+                    self.position += 1;
+                } else {
+                    let mut suggestion = String::new();
+                    std::mem::swap(&mut self.suggestion.data, &mut suggestion);
+                    suggestion.chars().for_each(|c| self.write(c));
+                }
             }
             Action::MoveBackWord => {
                 self.position = self.find_previous_word();
@@ -168,6 +215,8 @@ impl Buffer {
                 self.position = self.data.len();
             }
         }
+
+        self.generate_suggestion();
     }
 }
 
@@ -250,7 +299,7 @@ fn read_action() -> Action {
     }
 }
 
-fn execute(buffer: Buffer) -> ! {
+fn execute(buffer: Buffer<'_>) -> ! {
     let args = buffer
         .data
         .into_iter()
@@ -269,16 +318,23 @@ fn execute(buffer: Buffer) -> ! {
     }
 }
 
+fn complete() {}
+
 pub(super) fn run() -> ! {
     crossterm::execute!(
         std::io::stdout(),
-        crossterm::style::SetForegroundColor(crossterm::style::Color::Blue),
+        crossterm::style::SetForegroundColor(crossterm::style::Color::Green),
         crossterm::style::Print("vai"),
         crossterm::style::ResetColor,
         crossterm::style::Print("> "),
     );
 
-    let mut buffer = Buffer::new();
+    let executors = match core::executors::load_default() {
+        Ok(executors) => executors,
+        Err(e) => process_error(e),
+    };
+
+    let mut buffer = Buffer::new(&executors);
 
     crossterm::terminal::enable_raw_mode();
 
@@ -287,7 +343,7 @@ pub(super) fn run() -> ! {
             Action::Noop => continue,
             Action::Execute => execute(buffer),
             Action::Cancel => exit(0),
-            Action::Complete => {}
+            Action::Complete => complete(),
             action => buffer.process_action(&action),
         }
 
@@ -297,8 +353,12 @@ pub(super) fn run() -> ! {
         crossterm::execute!(
             std::io::stdout(),
             crossterm::cursor::MoveToColumn(PROMPT_START),
+            crossterm::style::ResetColor,
             crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine),
             crossterm::style::Print(buffer_string),
+            crossterm::style::SetForegroundColor(crossterm::style::Color::Blue),
+            crossterm::style::Print(&buffer.suggestion.data),
+            crossterm::style::ResetColor,
             crossterm::cursor::MoveToColumn(cursor),
         );
     }

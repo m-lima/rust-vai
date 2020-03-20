@@ -18,6 +18,7 @@
   [X] Support unicode
   [ ] Add completion support
   [ ] Add suggestion support
+  [ ] Support lines longer than screen width
 
 ## UI
   [ ] Make UI
