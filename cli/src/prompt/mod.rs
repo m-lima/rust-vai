@@ -47,6 +47,7 @@ fn read_query(
 
         match action::read() {
             Action::Noop => continue,
+            Action::Exit => return,
             Action::Execute => return execute(target, &buffer),
             Action::Cancel => return read_target(terminal, executors, Some(target)),
             Action::Complete => complete(),
@@ -84,12 +85,12 @@ fn read_target(
         terminal.print(&buffer);
 
         match action::read() {
-            Action::Noop => continue,
+            Action::Noop | Action::Cancel => continue,
             Action::Execute => {
                 let target = buffer.data();
                 return read_query(terminal, executors, target);
             }
-            Action::Cancel => return,
+            Action::Exit => return,
             Action::Complete => complete(),
             Action::Edit(action) => buffer.edit(&action),
             Action::MoveCursor(scope) => buffer.move_cursor(&scope),

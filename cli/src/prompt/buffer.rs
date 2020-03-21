@@ -97,21 +97,24 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
     }
 
     fn generate_suggestion(&mut self) {
-        if self.position != self.data.len()
-            || self.position == 0
-            || self.data[self.position - 1].is_whitespace()
-        {
+        if self.data.is_empty() {
+            self.suggestion.clear();
             return;
         }
 
-        let start = self.find_previous_word();
-        let last_word = self.data[start..self.position].iter().collect::<String>();
+        let data = self.data();
 
-        if let Some(suggestion) = (self.suggester)(&last_word) {
-            self.suggestion = String::from(&suggestion[last_word.len()..suggestion.len()]);
+        if let Some(suggestion) = (self.suggester)(&data) {
+            self.suggestion = String::from(&suggestion[data.len()..suggestion.len()]);
         } else {
             self.suggestion.clear();
         }
+    }
+
+    fn grab_suggestion(&mut self) {
+        let mut suggestion = String::new();
+        std::mem::swap(&mut self.suggestion, &mut suggestion);
+        suggestion.chars().for_each(|c| self.write(c));
     }
 
     fn write(&mut self, c: char) {
@@ -184,9 +187,7 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
                 if self.position < self.data.len() {
                     self.position += 1;
                 } else {
-                    let mut suggestion = String::new();
-                    std::mem::swap(&mut self.suggestion, &mut suggestion);
-                    suggestion.chars().for_each(|c| self.write(c));
+                    self.grab_suggestion();
                 }
             }
             BackWord => {
@@ -199,7 +200,11 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
                 self.position = 0;
             }
             ForwardAll => {
-                self.position = self.data.len();
+                if self.position < self.data.len() {
+                    self.position = self.data.len();
+                } else {
+                    self.grab_suggestion();
+                }
             }
             WordAll | All => {}
         }

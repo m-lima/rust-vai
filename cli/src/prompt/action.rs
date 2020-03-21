@@ -2,6 +2,7 @@ pub(super) enum Action {
     Edit(EditAction),
     MoveCursor(Scope),
     Execute,
+    Exit,
     Cancel,
     Complete,
     Noop,
@@ -35,6 +36,7 @@ pub(super) fn read() -> Action {
     match crossterm::event::read() {
         Ok(crossterm::event::Event::Key(e)) => match e.code {
             crossterm::event::KeyCode::Enter => Action::Execute,
+            crossterm::event::KeyCode::Esc => Action::Cancel,
             crossterm::event::KeyCode::Tab => Action::Complete,
             crossterm::event::KeyCode::Backspace => Action::Edit(EditAction::Delete(Scope::Back)),
             crossterm::event::KeyCode::Delete => Action::Edit(EditAction::Delete(Scope::Forward)),
@@ -46,7 +48,7 @@ pub(super) fn read() -> Action {
                 if control(&e) {
                     match c {
                         'm' => Action::Execute,
-                        'c' => Action::Cancel,
+                        'c' => Action::Exit,
 
                         'b' => Action::MoveCursor(Scope::Back),
                         'f' => Action::MoveCursor(Scope::Forward),
