@@ -141,7 +141,7 @@ fn support(args: Vec<String>) -> Result {
                         .into_iter()
                         .for_each(|entry| println!("{}", entry));
                     target
-                        .complete(&query)
+                        .fuzzy_history(&query, 10)
                         .unwrap_or_else(|_| vec![])
                         .into_iter()
                         .for_each(|entry| println!("{}", entry));
@@ -195,7 +195,7 @@ fn main() {
     match select_mode(std::env::args()) {
         Mode::Interactive => {
             if atty::is(atty::Stream::Stdout) {
-                prompt::run()
+                return prompt::run();
             } else {
                 unimplemented!("No GUI yet");
             }

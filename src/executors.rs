@@ -91,16 +91,48 @@ impl Executor {
         self.save_history(query)
     }
 
-    /// Suggest up to 10 queries based on fuzzy matching of the history
+    /// Suggest up to `count` queries based on `String::starts_with()` matching of the history
     ///
     /// # Arguments
     ///
     /// * `query` - Query string to to get historic completions for
+    /// * `count` - Maximum number of items to return
     ///
     /// # Errors
     ///
     /// * If the path for the history cannot be created, then [`Error(Path)`](../error/struct.Error.html)
-    pub fn complete(&self, query: &str) -> Result<Vec<String>> {
+    pub fn strict_history(&self, query: &str, count: usize) -> Result<Vec<String>> {
+        use std::io::BufRead;
+
+        let path =
+            default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
+        std::fs::OpenOptions::new()
+            .write(false)
+            .read(true)
+            .open(path)
+            .map(std::io::BufReader::new)
+            .map(std::io::BufReader::lines)
+            .map(|lines| {
+                lines
+                    .filter_map(std::result::Result::ok)
+                    .filter(|line| line.starts_with(query))
+                    .take(count)
+                    .collect()
+            })
+            .or_else(|_| Ok(vec![]))
+    }
+
+    /// Suggest up to `count` queries based on fuzzy matching of the history
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query string to to get historic completions for
+    /// * `count` - Maximum number of items to return
+    ///
+    /// # Errors
+    ///
+    /// * If the path for the history cannot be created, then [`Error(Path)`](../error/struct.Error.html)
+    pub fn fuzzy_history(&self, query: &str, count: usize) -> Result<Vec<String>> {
         use std::io::BufRead;
 
         let path =
@@ -119,7 +151,7 @@ impl Executor {
                 completions.sort_unstable();
                 completions
                     .into_iter()
-                    .take(10)
+                    .take(count)
                     .map(FuzzyMatch::matched)
                     .collect()
             })
