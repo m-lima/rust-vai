@@ -16,4 +16,5 @@ short_description = "A browser query launcher"
 [dependencies]
 atty = "0.2"
 crossterm = "0.16"
+joinery = "2"
 vai-core = { path = ".." }

@@ -24,20 +24,30 @@ fn read_query(
     mut terminal: terminal::Terminal,
     executors: core::executors::Executors,
     target: String,
+    args: String,
 ) {
     let executor = if let Some(executor) = executors.find(&target) {
         executor
     } else {
         terminal.print_error("Invalid target");
-        return read_target(terminal, executors, Some(target));
+        let mut buffer = target;
+        if !args.is_empty() {
+            buffer.push(' ');
+            buffer.push_str(&args)
+        };
+        return read_target(terminal, executors, Some(buffer));
     };
 
-    let mut buffer = buffer::new(terminal.prompt_size(), None, |query| {
-        executor
-            .strict_history(query, 1)
-            .ok()
-            .and_then(|history| history.first().map(String::from))
-    });
+    let mut buffer = buffer::new(
+        terminal.prompt_size(),
+        if args.is_empty() { None } else { Some(args) },
+        |query| {
+            executor
+                .strict_history(query, 1)
+                .ok()
+                .and_then(|history| history.first().map(String::from))
+        },
+    );
 
     terminal.prompt(Some(&target));
     loop {
@@ -59,23 +69,19 @@ fn read_query(
     }
 }
 
-// Allowed because I disagree with clippy's argument for readability
-#[allow(clippy::find_map)]
 fn read_target(
     mut terminal: terminal::Terminal,
     executors: core::executors::Executors,
     buffer: Option<String>,
 ) {
+    // Allowed because I disagree with clippy's argument for readability
+    #[allow(clippy::find_map)]
     let mut buffer = buffer::new(terminal.prompt_size(), buffer, |target| {
-        if target.is_empty() {
-            None
-        } else {
-            executors
-                .list_targets()
-                .iter()
-                .find(|suggestion| suggestion.starts_with(target))
-                .map(|suggestion| String::from(*suggestion))
-        }
+        executors
+            .list_targets()
+            .iter()
+            .find(|suggestion| suggestion.starts_with(target))
+            .map(|suggestion| String::from(*suggestion))
     });
 
     terminal.prompt(None);
@@ -87,8 +93,19 @@ fn read_target(
         match action::read() {
             Action::Noop | Action::Cancel => continue,
             Action::Execute => {
-                let target = buffer.data();
-                return read_query(terminal, executors, target);
+                let mut data = buffer
+                    .data()
+                    .split_whitespace()
+                    .map(String::from)
+                    .collect::<Vec<_>>();
+                if data.is_empty() {
+                    continue;
+                } else {
+                    use joinery::Joinable;
+                    let target = data.remove(0);
+                    let args = data.join_with(' ').to_string();
+                    return read_query(terminal, executors, target, args);
+                }
             }
             Action::Exit => return,
             Action::Complete => complete(),

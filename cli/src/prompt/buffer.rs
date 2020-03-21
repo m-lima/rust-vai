@@ -21,6 +21,7 @@ pub(super) fn new<F: Fn(&str) -> Option<String>>(
 
     if let Some(data) = data {
         data.chars().for_each(|c| buffer.write(c));
+        buffer.generate_suggestion();
     }
 
     buffer
