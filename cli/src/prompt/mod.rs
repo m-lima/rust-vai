@@ -98,14 +98,15 @@ fn read_target(
                     .split_whitespace()
                     .map(String::from)
                     .collect::<Vec<_>>();
-                if data.is_empty() {
-                    continue;
-                } else {
+
+                if !data.is_empty() {
                     use joinery::Joinable;
                     let target = data.remove(0);
                     let args = data.join_with(' ').to_string();
                     return read_query(terminal, executors, target, args);
                 }
+
+                return;
             }
             Action::Exit => return,
             Action::Complete => complete(),

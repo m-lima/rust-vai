@@ -116,11 +116,11 @@ fn print_targets() -> Result {
 fn support(args: Vec<String>) -> Result {
     match args[0].as_str().into() {
         flag::Flag::Help => print_usage(),
-        flag::Flag::Read => core::executors::load_default()?
+        flag::Flag::Write => core::executors::load_default()?
             .to_json()
             .map(|json| println!("{}", json))
             .map_err(Error::from),
-        flag::Flag::Write => core::executors::load_from_stdin()?
+        flag::Flag::Read => core::executors::load_from_stdin()?
             .save_default()
             .map_err(Error::from),
         flag::Flag::Targets => print_targets(),

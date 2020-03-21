@@ -17,8 +17,9 @@
   [ ] Cater for `target word "  word2   "`
   [X] Support unicode
   [ ] Add completion support
-  [ ] Add suggestion support
-  [ ] Support lines longer than screen width
+  [X] Add suggestion support
+  [X] Support lines longer than screen width
+  [ ] Review performance of wide inputs
 
 ## UI
   [ ] Make UI
@@ -32,4 +33,4 @@ vai
  |_ ui
  |_ macros
 ```
-  [ ] Make macro lib for enum options
+  [X] ~~Make macro lib for enum options~~

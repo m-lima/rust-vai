@@ -42,6 +42,10 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
         self.data.iter().collect()
     }
 
+    pub(super) fn data_raw(&self) -> &Vec<char> {
+        &self.data
+    }
+
     fn find_next_word(&self) -> usize {
         let end = self.data.len();
         if self.position == end {

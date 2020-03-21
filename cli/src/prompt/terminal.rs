@@ -99,18 +99,60 @@ impl Terminal {
         buffer: &super::buffer::Buffer<F>,
     ) {
         self.cursor_position = self.prompt_start + buffer.position();
+        let mut width = usize::from(
+            crossterm::terminal::size().map_or_else(|_| u16::max_value(), |size| size.0) + 1
+                - self.prompt_start,
+        );
 
-        crossterm::execute!(
-            std::io::stdout(),
-            crossterm::cursor::MoveToColumn(self.prompt_start),
-            crossterm::style::ResetColor,
+        let mut stdout = std::io::stdout();
+        crossterm::queue!(stdout, crossterm::cursor::MoveToColumn(self.prompt_start));
+
+        // Main buffer
+        {
+            let data = buffer.data_raw();
+            let char_len = data.len();
+
+            if char_len < width {
+                crossterm::queue!(stdout, crossterm::style::Print(buffer.data()));
+                width -= char_len;
+            } else {
+                let position = usize::from(buffer.position());
+                let data = if position > width {
+                    data[position - width..position].iter().collect::<String>()
+                } else {
+                    data[0..width].iter().collect::<String>()
+                };
+                crossterm::queue!(stdout, crossterm::style::Print(data));
+                width = 0;
+            }
+        }
+
+        // Suggestion buffer
+        {
+            let suggestion = buffer.suggestion();
+            if width > 0 && !suggestion.is_empty() {
+                let data = if suggestion.len() < width {
+                    suggestion.clone()
+                } else {
+                    suggestion.chars().take(width).collect::<String>()
+                };
+
+                crossterm::queue!(
+                    stdout,
+                    crossterm::style::SetForegroundColor(crossterm::style::Color::Blue),
+                    crossterm::style::Print(data),
+                    crossterm::style::ResetColor,
+                );
+            }
+        }
+
+        crossterm::queue!(
+            stdout,
             crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine),
-            crossterm::style::Print(buffer.data()),
-            crossterm::style::SetForegroundColor(crossterm::style::Color::Blue),
-            crossterm::style::Print(buffer.suggestion()),
-            crossterm::style::ResetColor,
             crossterm::cursor::MoveToColumn(self.cursor_position),
         );
+
+        stdout.flush();
     }
 
     pub(super) fn clear_error(&mut self) {
