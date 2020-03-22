@@ -1,8 +1,8 @@
 pub(super) struct Buffer<F: Fn(&str) -> Option<String>> {
-    data: Vec<char>,
-    suggestion: String,
     max_size: usize,
+    data: Vec<char>,
     position: usize,
+    suggestion: String,
     suggester: F,
 }
 
@@ -13,10 +13,10 @@ pub(super) fn new<F: Fn(&str) -> Option<String>>(
 ) -> Buffer<F> {
     let mut buffer = Buffer {
         max_size: usize::from(u16::max_value() - prompt_size),
-        position: 0,
         data: Vec::new(),
-        suggester,
+        position: 0,
         suggestion: String::new(),
+        suggester,
     };
 
     if let Some(data) = data {

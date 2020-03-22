@@ -72,11 +72,11 @@ fn read_query(
 fn read_target(
     mut terminal: terminal::Terminal,
     executors: core::executors::Executors,
-    buffer: Option<String>,
+    args: Option<String>,
 ) {
     // Allowed because I disagree with clippy's argument for readability
     #[allow(clippy::find_map)]
-    let mut buffer = buffer::new(terminal.prompt_size(), buffer, |target| {
+    let mut buffer = buffer::new(terminal.prompt_size(), args, |target| {
         executors
             .list_targets()
             .iter()

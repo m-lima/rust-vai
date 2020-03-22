@@ -21,6 +21,7 @@
   [X] Add suggestion support
   [X] Support lines longer than screen width
   [ ] Review performance of wide inputs
+  [ ] Hard to tell if there is a suggestion on wide input
 
 ## UI
   [ ] Make UI
