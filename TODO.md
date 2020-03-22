@@ -12,6 +12,7 @@
   [ ] Make flags enum
   [ ] Better error reporting
   [ ] Make completions file dynamic
+  [ ] ***Atty not working on windows***
 
 ## Prompt
   [ ] Cater for `target word "  word2   "`
