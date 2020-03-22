@@ -94,10 +94,7 @@ impl Terminal {
         self.cursor_position = self.prompt_start;
     }
 
-    pub(super) fn print<F: Fn(&str) -> Option<String>>(
-        &mut self,
-        buffer: &super::buffer::Buffer<F>,
-    ) {
+    pub(super) fn print(&mut self, buffer: &super::buffer::Buffer, suggestion: &str) {
         self.cursor_position = self.prompt_start + buffer.position();
         let mut width = usize::from(
             crossterm::terminal::size().map_or_else(|_| u16::max_value(), |size| size.0) + 1
@@ -129,10 +126,9 @@ impl Terminal {
 
         // Suggestion buffer
         {
-            let suggestion = buffer.suggestion();
             if width > 0 && !suggestion.is_empty() {
                 let data = if suggestion.len() < width {
-                    suggestion.clone()
+                    String::from(suggestion)
                 } else {
                     suggestion.chars().take(width).collect::<String>()
                 };

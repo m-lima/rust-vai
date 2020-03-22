@@ -4,9 +4,11 @@ use vai_core as core;
 
 mod action;
 mod buffer;
+mod navigation;
+mod suggester;
 mod terminal;
 
-fn execute<F: Fn(&str) -> Option<String>>(target: String, buffer: &buffer::Buffer<F>) {
+fn execute(target: String, buffer: &buffer::Buffer) {
     let mut args = vec![target];
     buffer
         .data()
@@ -24,36 +26,38 @@ fn read_query(
     mut terminal: terminal::Terminal,
     executors: core::executors::Executors,
     target: String,
-    args: String,
+    args: Option<String>,
 ) {
     let executor = if let Some(executor) = executors.find(&target) {
         executor
     } else {
         terminal.print_error("Invalid target");
         let mut buffer = target;
-        if !args.is_empty() {
+        if let Some(args) = args {
             buffer.push(' ');
-            buffer.push_str(&args)
-        };
+            buffer.push_str(&args);
+        }
         return read_target(terminal, executors, Some(buffer));
     };
 
-    let mut buffer = buffer::new(
-        terminal.prompt_size(),
-        if args.is_empty() { None } else { Some(args) },
-        |query| {
-            executor
-                .strict_history(query, 1)
-                .ok()
-                .and_then(|history| history.first().map(String::from))
-        },
-    );
-
     terminal.prompt(Some(&target));
+    let mut buffer = buffer::new(u16::max_value() - terminal.prompt_size());
+    let mut suggester = suggester::new(|query| {
+        executor
+            .strict_history(query, 1)
+            .ok()
+            .and_then(|history| history.first().map(String::from))
+    });
+
+    if let Some(args) = args {
+        buffer.write_str(&args);
+        suggester.generate(&buffer);
+    }
+
     loop {
         use action::Action;
 
-        terminal.print(&buffer);
+        terminal.print(&buffer, suggester.suggestion());
 
         match action::read() {
             Action::Noop => continue,
@@ -61,8 +65,24 @@ fn read_query(
             Action::Execute => return execute(target, &buffer),
             Action::Cancel => return read_target(terminal, executors, Some(target)),
             Action::Complete => complete(),
-            Action::Edit(action) => buffer.edit(&action),
-            Action::MoveCursor(scope) => buffer.move_cursor(&scope),
+            Action::Edit(action) => {
+                buffer.edit(&action);
+                suggester.generate(&buffer);
+            }
+            Action::MoveCursor(scope) => {
+                if buffer.at_end() {
+                    match scope {
+                        action::Scope::Forward | action::Scope::ForwardAll => {
+                            buffer.write_str(&suggester.take());
+                        }
+                        action::Scope::ForwardWord => {
+                            buffer.write_str(&suggester.take_next_word());
+                        }
+                        _ => {}
+                    }
+                }
+                buffer.move_cursor(&scope)
+            }
         }
 
         terminal.clear_error();
@@ -74,9 +94,11 @@ fn read_target(
     executors: core::executors::Executors,
     args: Option<String>,
 ) {
+    terminal.prompt(None);
+    let mut buffer = buffer::new(u16::max_value() - terminal.prompt_size());
     // Allowed because I disagree with clippy's argument for readability
     #[allow(clippy::find_map)]
-    let mut buffer = buffer::new(terminal.prompt_size(), args, |target| {
+    let mut suggester = suggester::new(|target| {
         executors
             .list_targets()
             .iter()
@@ -84,11 +106,15 @@ fn read_target(
             .map(|suggestion| String::from(*suggestion))
     });
 
-    terminal.prompt(None);
+    if let Some(args) = args {
+        buffer.write_str(&args);
+        suggester.generate(&buffer);
+    }
+
     loop {
         use action::Action;
 
-        terminal.print(&buffer);
+        terminal.print(&buffer, suggester.suggestion());
 
         match action::read() {
             Action::Noop | Action::Cancel => continue,
@@ -102,7 +128,11 @@ fn read_target(
                 if !data.is_empty() {
                     use joinery::Joinable;
                     let target = data.remove(0);
-                    let args = data.join_with(' ').to_string();
+                    let args = if data.is_empty() {
+                        None
+                    } else {
+                        Some(data.join_with(' ').to_string())
+                    };
                     return read_query(terminal, executors, target, args);
                 }
 
@@ -110,8 +140,24 @@ fn read_target(
             }
             Action::Exit => return,
             Action::Complete => complete(),
-            Action::Edit(action) => buffer.edit(&action),
-            Action::MoveCursor(scope) => buffer.move_cursor(&scope),
+            Action::Edit(action) => {
+                buffer.edit(&action);
+                suggester.generate(&buffer);
+            }
+            Action::MoveCursor(scope) => {
+                if buffer.at_end() {
+                    match scope {
+                        action::Scope::Forward | action::Scope::ForwardAll => {
+                            buffer.write_str(&suggester.take());
+                        }
+                        action::Scope::ForwardWord => {
+                            buffer.write_str(&suggester.take_next_word());
+                        }
+                        _ => {}
+                    }
+                }
+                buffer.move_cursor(&scope)
+            }
         }
 
         terminal.clear_error();

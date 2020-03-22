@@ -1,41 +1,26 @@
-pub(super) struct Buffer<F: Fn(&str) -> Option<String>> {
+pub(super) struct Buffer {
     max_size: usize,
     data: Vec<char>,
     position: usize,
-    suggestion: String,
-    suggester: F,
 }
 
-pub(super) fn new<F: Fn(&str) -> Option<String>>(
-    prompt_size: u16,
-    data: Option<String>,
-    suggester: F,
-) -> Buffer<F> {
-    let mut buffer = Buffer {
-        max_size: usize::from(u16::max_value() - prompt_size),
+pub(super) fn new(max_size: u16) -> Buffer {
+    Buffer {
+        max_size: usize::from(max_size),
         data: Vec::new(),
         position: 0,
-        suggestion: String::new(),
-        suggester,
-    };
-
-    if let Some(data) = data {
-        data.chars().for_each(|c| buffer.write(c));
-        buffer.generate_suggestion();
     }
-
-    buffer
 }
 
-impl<F: Fn(&str) -> Option<String>> Buffer<F> {
+impl Buffer {
     // Allowed because it is guarded in the `write` method
     #[allow(clippy::cast_possible_truncation)]
     pub(super) fn position(&self) -> u16 {
         self.position as u16
     }
 
-    pub(super) fn suggestion(&self) -> &String {
-        &self.suggestion
+    pub(super) fn at_end(&self) -> bool {
+        self.position == self.data.len()
     }
 
     pub(super) fn data(&self) -> String {
@@ -46,80 +31,8 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
         &self.data
     }
 
-    fn find_next_word(&self) -> usize {
-        let end = self.data.len();
-        if self.position == end {
-            self.position
-        } else {
-            let mut index = self.position;
-
-            while index < end && !self.data[index].is_whitespace() {
-                index += 1;
-            }
-
-            while index < end && self.data[index].is_whitespace() {
-                index += 1;
-            }
-
-            index
-        }
-    }
-
-    fn find_previous_word(&self) -> usize {
-        if self.position == 0 {
-            self.position
-        } else {
-            let mut index = self.position - 1;
-
-            while index > 0 && self.data[index].is_whitespace() {
-                index -= 1;
-            }
-
-            while index > 0 && !self.data[index - 1].is_whitespace() {
-                index -= 1;
-            }
-
-            index
-        }
-    }
-
-    fn find_previous_word_end(&self) -> usize {
-        if self.position == 0 {
-            self.position
-        } else {
-            let mut index = self.position - 1;
-
-            while index > 0 && !self.data[index].is_whitespace() {
-                index -= 1;
-            }
-
-            while index > 0 && self.data[index - 1].is_whitespace() {
-                index -= 1;
-            }
-
-            index
-        }
-    }
-
-    fn generate_suggestion(&mut self) {
-        if self.data.is_empty() {
-            self.suggestion.clear();
-            return;
-        }
-
-        let data = self.data();
-
-        if let Some(suggestion) = (self.suggester)(&data) {
-            self.suggestion = String::from(&suggestion[data.len()..suggestion.len()]);
-        } else {
-            self.suggestion.clear();
-        }
-    }
-
-    fn grab_suggestion(&mut self) {
-        let mut suggestion = String::new();
-        std::mem::swap(&mut self.suggestion, &mut suggestion);
-        suggestion.chars().for_each(|c| self.write(c));
+    pub(super) fn write_str(&mut self, string: &str) {
+        string.chars().for_each(|c| self.write(c));
     }
 
     fn write(&mut self, c: char) {
@@ -144,12 +57,12 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
                 }
             }
             BackWord => {
-                let index = self.find_previous_word();
+                let index = super::navigation::previous_word(self.position, &self.data);
                 self.data.drain(index..self.position);
                 self.position = index;
             }
             ForwardWord => {
-                let index = self.find_next_word();
+                let index = super::navigation::next_word(self.position, &self.data);
                 self.data.drain(self.position..index);
             }
             BackAll => {
@@ -164,8 +77,8 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
                 self.position = 0;
             }
             WordAll => {
-                let start = self.find_previous_word_end();
-                let end = self.find_next_word();
+                let start = super::navigation::previous_word_end(self.position, &self.data);
+                let end = super::navigation::next_word(self.position, &self.data);
                 self.data.drain(start + 1..end);
                 self.data[start] = ' ';
                 self.position = start;
@@ -178,28 +91,26 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
             super::action::EditAction::Write(c) => self.write(*c),
             super::action::EditAction::Delete(scope) => self.delete(scope),
         }
-
-        self.generate_suggestion();
     }
 
     pub(super) fn move_cursor(&mut self, scope: &super::action::Scope) {
         use super::action::Scope::*;
         match scope {
             Back => {
-                self.position -= 1;
+                if self.position > 0 {
+                    self.position -= 1;
+                }
             }
             Forward => {
                 if self.position < self.data.len() {
                     self.position += 1;
-                } else {
-                    self.grab_suggestion();
                 }
             }
             BackWord => {
-                self.position = self.find_previous_word();
+                self.position = super::navigation::previous_word(self.position, &self.data);
             }
             ForwardWord => {
-                self.position = self.find_next_word();
+                self.position = super::navigation::next_word(self.position, &self.data);
             }
             BackAll => {
                 self.position = 0;
@@ -207,8 +118,6 @@ impl<F: Fn(&str) -> Option<String>> Buffer<F> {
             ForwardAll => {
                 if self.position < self.data.len() {
                     self.position = self.data.len();
-                } else {
-                    self.grab_suggestion();
                 }
             }
             WordAll | All => {}
