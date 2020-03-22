@@ -4,6 +4,7 @@ static BASE_PROMPT_SIZE: u16 = 6;
 
 pub(super) struct Terminal {
     has_error: bool,
+    completion_lines: u16,
     prompt_start: u16,
     cursor_position: u16,
 }
@@ -25,18 +26,19 @@ pub(super) fn new() -> Terminal {
     std::panic::set_hook(Box::new(|info| {
         let payload = info.payload();
         if let Some(message) = payload.downcast_ref::<&str>() {
-            print_error_raw(message).flush();
+            print_error(message);
             return;
         }
         if let Some(message) = payload.downcast_ref::<String>() {
-            print_error_raw(message).flush();
+            print_error(message);
             return;
         }
-        print_error_raw("unhandled exception");
+        print_error("unhandled exception");
     }));
 
     Terminal {
         has_error: false,
+        completion_lines: 0,
         prompt_start: BASE_PROMPT_SIZE,
         cursor_position: BASE_PROMPT_SIZE,
     }
@@ -153,8 +155,16 @@ impl Terminal {
 
     pub(super) fn clear_error(&mut self) {
         if self.has_error {
-            crossterm::execute!(
-                std::io::stdout(),
+            let mut stdout = std::io::stdout();
+            self.clear_error_internal(&mut stdout);
+            stdout.flush();
+        }
+    }
+
+    fn clear_error_internal(&mut self, stdout: &mut std::io::Stdout) {
+        if self.has_error {
+            crossterm::queue!(
+                stdout,
                 crossterm::cursor::MoveDown(1),
                 crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
                 crossterm::cursor::MoveUp(1),
@@ -165,7 +175,10 @@ impl Terminal {
     }
 
     pub(super) fn print_error<M: std::fmt::Display>(&mut self, message: M) {
-        let mut stdout = print_error_raw(message);
+        let mut stdout = std::io::stdout();
+
+        self.clear_completions_internal(&mut stdout);
+        print_error_internal(message, &mut stdout);
 
         crossterm::queue!(
             stdout,
@@ -175,14 +188,74 @@ impl Terminal {
         stdout.flush();
         self.has_error = true;
     }
+
+    pub(super) fn _clear_completions(&mut self) {
+        if self.completion_lines > 0 {
+            let mut stdout = std::io::stdout();
+            self.clear_completions_internal(&mut stdout);
+            stdout.flush();
+        }
+    }
+
+    fn clear_completions_internal(&mut self, stdout: &mut std::io::Stdout) {
+        if self.completion_lines > 0 {
+            for _ in 0..self.completion_lines {
+                crossterm::queue!(
+                    stdout,
+                    crossterm::cursor::MoveDown(1),
+                    crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                );
+            }
+
+            crossterm::queue!(
+                stdout,
+                crossterm::cursor::MoveUp(self.completion_lines),
+                crossterm::cursor::MoveToColumn(self.cursor_position),
+            );
+
+            self.completion_lines = 0;
+        }
+    }
+
+    pub(super) fn print_completions<C: std::fmt::Display>(&mut self, completions: &[C]) {
+        let mut stdout = std::io::stdout();
+        self.clear_error_internal(&mut stdout);
+        self.clear_completions_internal(&mut stdout);
+        self.completion_lines = 0;
+
+        if !completions.is_empty() {
+            for completion in completions {
+                crossterm::queue!(
+                    stdout,
+                    crossterm::style::Print('\n'),
+                    crossterm::cursor::MoveToColumn(0),
+                    crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                    crossterm::style::Print(completion),
+                );
+                self.completion_lines += 1;
+            }
+
+            crossterm::queue!(
+                stdout,
+                crossterm::cursor::MoveUp(self.completion_lines),
+                crossterm::cursor::MoveToColumn(self.cursor_position),
+            );
+        }
+
+        stdout.flush();
+    }
 }
 
-fn print_error_raw<M: std::fmt::Display>(message: M) -> std::io::Stdout {
+fn print_error<M: std::fmt::Display>(message: M) {
     let mut stdout = std::io::stdout();
+    print_error_internal(message, &mut stdout);
+    stdout.flush();
+}
 
+fn print_error_internal<M: std::fmt::Display>(message: M, stdout: &mut std::io::Stdout) {
     crossterm::queue!(
         stdout,
-        crossterm::style::Print("\n"),
+        crossterm::style::Print('\n'),
         crossterm::cursor::MoveToColumn(0),
         crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
         crossterm::style::SetForegroundColor(crossterm::style::Color::Red),
@@ -190,7 +263,6 @@ fn print_error_raw<M: std::fmt::Display>(message: M) -> std::io::Stdout {
         crossterm::style::ResetColor,
         crossterm::style::Print(message.to_string()),
     );
-    stdout
 }
 
 pub(super) fn fatal<M: std::fmt::Display>(message: M) -> ! {

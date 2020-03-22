@@ -20,7 +20,37 @@ fn execute(target: String, buffer: &buffer::Buffer) {
     }
 }
 
-fn complete() {}
+fn edit<F>(
+    action: &action::EditAction,
+    buffer: &mut buffer::Buffer,
+    suggester: &mut suggester::Suggester<F>,
+) where
+    F: Fn(&str) -> Option<String>,
+{
+    buffer.edit(&action);
+    suggester.generate(&buffer);
+}
+
+fn move_cursor<F>(
+    scope: &action::Scope,
+    buffer: &mut buffer::Buffer,
+    suggester: &mut suggester::Suggester<F>,
+) where
+    F: Fn(&str) -> Option<String>,
+{
+    if buffer.at_end() {
+        match scope {
+            action::Scope::Forward | action::Scope::ForwardAll => {
+                buffer.write_str(&suggester.take());
+            }
+            action::Scope::ForwardWord => {
+                buffer.write_str(&suggester.take_next_word());
+            }
+            _ => {}
+        }
+    }
+    buffer.move_cursor(&scope)
+}
 
 fn read_query(
     mut terminal: terminal::Terminal,
@@ -64,25 +94,18 @@ fn read_query(
             Action::Exit => return,
             Action::Execute => return execute(target, &buffer),
             Action::Cancel => return read_target(terminal, executors, Some(target)),
-            Action::Complete => complete(),
-            Action::Edit(action) => {
-                buffer.edit(&action);
-                suggester.generate(&buffer);
+            Action::Complete => {
+                terminal.print_completions(&{
+                    let query = buffer.data();
+                    let mut completions = executor
+                        .fuzzy_history(&query, 10)
+                        .unwrap_or_else(|_| vec![]);
+                    completions.extend(executor.suggest(&query).unwrap_or_else(|_| vec![]));
+                    completions
+                });
             }
-            Action::MoveCursor(scope) => {
-                if buffer.at_end() {
-                    match scope {
-                        action::Scope::Forward | action::Scope::ForwardAll => {
-                            buffer.write_str(&suggester.take());
-                        }
-                        action::Scope::ForwardWord => {
-                            buffer.write_str(&suggester.take_next_word());
-                        }
-                        _ => {}
-                    }
-                }
-                buffer.move_cursor(&scope)
-            }
+            Action::Edit(action) => edit(&action, &mut buffer, &mut suggester),
+            Action::MoveCursor(scope) => move_cursor(&scope, &mut buffer, &mut suggester),
         }
 
         terminal.clear_error();
@@ -139,25 +162,11 @@ fn read_target(
                 return;
             }
             Action::Exit => return,
-            Action::Complete => complete(),
-            Action::Edit(action) => {
-                buffer.edit(&action);
-                suggester.generate(&buffer);
+            Action::Complete => {
+                terminal.print_completions(&executors.list_targets());
             }
-            Action::MoveCursor(scope) => {
-                if buffer.at_end() {
-                    match scope {
-                        action::Scope::Forward | action::Scope::ForwardAll => {
-                            buffer.write_str(&suggester.take());
-                        }
-                        action::Scope::ForwardWord => {
-                            buffer.write_str(&suggester.take_next_word());
-                        }
-                        _ => {}
-                    }
-                }
-                buffer.move_cursor(&scope)
-            }
+            Action::Edit(action) => edit(&action, &mut buffer, &mut suggester),
+            Action::MoveCursor(scope) => move_cursor(&scope, &mut buffer, &mut suggester),
         }
 
         terminal.clear_error();
