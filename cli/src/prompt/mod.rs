@@ -108,23 +108,21 @@ fn read_query(
                         suggester.generate(&buffer);
                     }
                 } else {
-                    completions = Some(completions::new(
-                            {
-                                let query = buffer.data();
-                                let mut completions = executor
-                                    .fuzzy_history(&query, 10)
-                                    .unwrap_or_else(|_| vec![]);
-                                completions.extend(executor.suggest(&query).unwrap_or_else(|_| vec![]));
-                                completions
-                            },
-                    ));
+                    completions = Some(completions::new({
+                        let query = buffer.data();
+                        let mut completions = executor
+                            .fuzzy_history(&query, 10)
+                            .unwrap_or_else(|_| vec![]);
+                        completions.extend(executor.suggest(&query).unwrap_or_else(|_| vec![]));
+                        completions
+                    }));
                 }
                 terminal.print_completions(completions.as_ref().unwrap());
             }
             Action::Edit(action) => {
                 edit(&action, &mut buffer, &mut suggester);
                 completions = None;
-            },
+            }
             Action::MoveCursor(scope) => move_cursor(&scope, &mut buffer, &mut suggester),
         }
 

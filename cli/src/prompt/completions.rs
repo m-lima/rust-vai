@@ -12,41 +12,36 @@ pub(super) fn new(data: Vec<String>) -> Completions {
 
 impl Completions {
     pub(super) fn select_up(&mut self) -> Option<&str> {
-        if !self.data.is_empty() {
-            self.selected = Some(
-                self.selected
-                    .map(|selected| {
-                        if selected == 0 {
-                            self.data.len() - 1
-                        } else {
-                            selected - 1
-                        }
-                    })
-                    .unwrap_or_else(|| self.data.len() - 1),
-            );
+        if self.data.is_empty() {
+            None
+        } else {
+            self.selected = Some(self.selected.map_or_else(
+                || self.data.len() - 1,
+                |selected| {
+                    if selected == 0 {
+                        self.data.len() - 1
+                    } else {
+                        selected - 1
+                    }
+                },
+            ));
 
             Some(&self.data[self.selected.unwrap()])
-        } else {
-            None
         }
     }
 
     pub(super) fn select_down(&mut self) -> Option<&str> {
-        if !self.data.is_empty() {
-            self.selected = Some(
-                self.selected
-                    .map(|selected| {
-                        if selected == self.data.len() - 1 {
-                            0
-                        } else {
-                            selected + 1
-                        }
-                    })
-                    .unwrap_or(0),
-            );
-            Some(&self.data[self.selected.unwrap()])
-        } else {
+        if self.data.is_empty() {
             None
+        } else {
+            self.selected = Some(self.selected.map_or(0, |selected| {
+                if selected == self.data.len() - 1 {
+                    0
+                } else {
+                    selected + 1
+                }
+            }));
+            Some(&self.data[self.selected.unwrap()])
         }
     }
 
