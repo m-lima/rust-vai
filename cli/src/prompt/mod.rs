@@ -5,6 +5,7 @@ use vai_core as core;
 mod action;
 mod buffer;
 mod completions;
+// mod context;
 mod navigation;
 mod suggester;
 mod terminal;

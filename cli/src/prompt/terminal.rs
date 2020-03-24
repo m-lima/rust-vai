@@ -226,7 +226,7 @@ impl Terminal {
         self.completion_lines = 0;
         let selected = completions.selected().unwrap_or_else(usize::max_value);
 
-        for completion in completions.completions() {
+        for completion in completions.data() {
             crossterm::queue!(
                 stdout,
                 crossterm::style::Print('\n'),

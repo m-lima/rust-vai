@@ -1,42 +1,42 @@
 pub(super) struct Completions {
-    completions: Vec<String>,
+    data: Vec<String>,
     selected: Option<usize>,
 }
 
-pub(super) fn new(completions: Vec<String>) -> Completions {
+pub(super) fn new(data: Vec<String>) -> Completions {
     Completions {
-        completions,
+        data,
         selected: None,
     }
 }
 
 impl Completions {
     pub(super) fn select_up(&mut self) -> Option<&str> {
-        if !self.completions.is_empty() {
+        if !self.data.is_empty() {
             self.selected = Some(
                 self.selected
                     .map(|selected| {
                         if selected == 0 {
-                            self.completions.len() - 1
+                            self.data.len() - 1
                         } else {
                             selected - 1
                         }
                     })
-                    .unwrap_or_else(|| self.completions.len() - 1),
+                    .unwrap_or_else(|| self.data.len() - 1),
             );
 
-            Some(&self.completions[self.selected.unwrap()])
+            Some(&self.data[self.selected.unwrap()])
         } else {
             None
         }
     }
 
     pub(super) fn select_down(&mut self) -> Option<&str> {
-        if !self.completions.is_empty() {
+        if !self.data.is_empty() {
             self.selected = Some(
                 self.selected
                     .map(|selected| {
-                        if selected == self.completions.len() - 1 {
+                        if selected == self.data.len() - 1 {
                             0
                         } else {
                             selected + 1
@@ -44,14 +44,14 @@ impl Completions {
                     })
                     .unwrap_or(0),
             );
-            Some(&self.completions[self.selected.unwrap()])
+            Some(&self.data[self.selected.unwrap()])
         } else {
             None
         }
     }
 
-    pub(super) fn completions(&self) -> &Vec<String> {
-        &self.completions
+    pub(super) fn data(&self) -> &Vec<String> {
+        &self.data
     }
 
     pub(super) fn selected(&self) -> &Option<usize> {
