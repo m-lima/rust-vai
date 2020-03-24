@@ -1,22 +1,25 @@
 pub(super) struct Buffer {
-    max_size: usize,
     data: Vec<char>,
     position: usize,
 }
 
-pub(super) fn new(max_size: u16) -> Buffer {
+pub(super) fn new() -> Buffer {
     Buffer {
-        max_size: usize::from(max_size),
         data: Vec::new(),
         position: 0,
     }
 }
 
+pub(super) fn from(data: &str) -> Buffer {
+    Buffer {
+        data: data.chars().collect(),
+        position: 0,
+    }
+}
+
 impl Buffer {
-    // Allowed because it is guarded in the `write` method
-    #[allow(clippy::cast_possible_truncation)]
-    pub(super) fn position(&self) -> u16 {
-        self.position as u16
+    pub(super) fn position(&self) -> &usize {
+        &self.position
     }
 
     pub(super) fn at_end(&self) -> bool {
@@ -46,10 +49,8 @@ impl Buffer {
     }
 
     fn write(&mut self, c: char) {
-        if self.data.len() < self.max_size {
-            self.data.insert(self.position, c);
-            self.position += 1;
-        }
+        self.data.insert(self.position, c);
+        self.position += 1;
     }
 
     fn delete(&mut self, scope: &super::action::Scope) {

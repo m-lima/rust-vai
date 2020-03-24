@@ -91,17 +91,12 @@ impl Executor {
         self.save_history(query)
     }
 
-    /// Suggest up to `count` queries based on `String::starts_with()` matching of the history
-    ///
-    /// # Arguments
-    ///
-    /// * `query` - Query string to to get historic completions for
-    /// * `count` - Maximum number of items to return
+    /// Returns the complete history from file
     ///
     /// # Errors
     ///
     /// * If the path for the history cannot be created, then [`Error(Path)`](../error/struct.Error.html)
-    pub fn strict_history(&self, query: &str, count: usize) -> Result<Vec<String>> {
+    pub fn history(&self) -> Result<Vec<String>> {
         use std::io::BufRead;
 
         let path =
@@ -112,13 +107,7 @@ impl Executor {
             .open(path)
             .map(std::io::BufReader::new)
             .map(std::io::BufReader::lines)
-            .map(|lines| {
-                lines
-                    .filter_map(std::result::Result::ok)
-                    .filter(|line| line.starts_with(query))
-                    .take(count)
-                    .collect()
-            })
+            .map(|lines| lines.filter_map(std::result::Result::ok).collect())
             .or_else(|_| Ok(vec![]))
     }
 

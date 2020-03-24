@@ -63,7 +63,7 @@ impl Terminal {
         (effective_prompt, size)
     }
 
-    pub(super) fn prompt(&mut self, secondary_prompt: Option<&str>) {
+    pub(super) fn prompt(&mut self, context: &super::context::Context) {
         self.prompt_start = BASE_PROMPT_SIZE;
 
         let mut stdout = std::io::stdout();
@@ -78,7 +78,7 @@ impl Terminal {
             crossterm::style::ResetColor,
         );
 
-        if let Some(secondary_prompt) = secondary_prompt {
+        if let Some(secondary_prompt) = context.target() {
             let (effective_prompt, size) = Terminal::clip_prompt(secondary_prompt);
 
             self.prompt_start += size;
@@ -98,12 +98,14 @@ impl Terminal {
         self.cursor_position = self.prompt_start;
     }
 
+    // TODO Revisit this (look into position() and how to avoid creating new strings)
     pub(super) fn print(&mut self, buffer: &super::buffer::Buffer, suggestion: &str) {
-        self.cursor_position = self.prompt_start + buffer.position();
         let mut width = usize::from(
             crossterm::terminal::size().map_or_else(|_| u16::max_value(), |size| size.0) + 1
                 - self.prompt_start,
         );
+        let position = std::cmp::min(*buffer.position(), width);
+        self.cursor_position = self.prompt_start + position as u16;
 
         let mut stdout = std::io::stdout();
         crossterm::queue!(stdout, crossterm::cursor::MoveToColumn(self.prompt_start));
@@ -117,7 +119,6 @@ impl Terminal {
                 crossterm::queue!(stdout, crossterm::style::Print(buffer.data()));
                 width -= char_len;
             } else {
-                let position = usize::from(buffer.position());
                 let data = if position > width {
                     data[position - width..position].iter().collect::<String>()
                 } else {
