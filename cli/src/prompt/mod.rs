@@ -4,6 +4,7 @@ use vai_core as core;
 
 mod action;
 mod buffer;
+mod completions;
 mod navigation;
 mod suggester;
 mod terminal;
@@ -78,6 +79,7 @@ fn read_query(
             .ok()
             .and_then(|history| history.first().map(String::from))
     });
+    let mut completions: Option<completions::Completions> = None;
 
     if let Some(args) = args {
         buffer.write_str(&args);
@@ -94,17 +96,34 @@ fn read_query(
             Action::Exit => return,
             Action::Execute => return execute(target, &buffer),
             Action::Cancel => return read_target(terminal, executors, Some(target)),
-            Action::Complete => {
-                terminal.print_completions(&{
-                    let query = buffer.data();
-                    let mut completions = executor
-                        .fuzzy_history(&query, 10)
-                        .unwrap_or_else(|_| vec![]);
-                    completions.extend(executor.suggest(&query).unwrap_or_else(|_| vec![]));
-                    completions
-                });
+            Action::Complete(direction) => {
+                if let Some(completions) = completions.as_mut() {
+                    use action::Direction;
+                    if let Some(completion) = match direction {
+                        Direction::Down => completions.select_down(),
+                        Direction::Up => completions.select_up(),
+                    } {
+                        buffer.set_str(completion);
+                        suggester.generate(&buffer);
+                    }
+                } else {
+                    completions = Some(completions::new(
+                            {
+                                let query = buffer.data();
+                                let mut completions = executor
+                                    .fuzzy_history(&query, 10)
+                                    .unwrap_or_else(|_| vec![]);
+                                completions.extend(executor.suggest(&query).unwrap_or_else(|_| vec![]));
+                                completions
+                            },
+                    ));
+                }
+                terminal.print_completions(completions.as_ref().unwrap());
             }
-            Action::Edit(action) => edit(&action, &mut buffer, &mut suggester),
+            Action::Edit(action) => {
+                edit(&action, &mut buffer, &mut suggester);
+                completions = None;
+            },
             Action::MoveCursor(scope) => move_cursor(&scope, &mut buffer, &mut suggester),
         }
 
@@ -128,6 +147,7 @@ fn read_target(
             .find(|suggestion| suggestion.starts_with(target))
             .map(|suggestion| String::from(*suggestion))
     });
+    let mut completions: Option<completions::Completions> = None;
 
     if let Some(args) = args {
         buffer.write_str(&args);
@@ -162,10 +182,32 @@ fn read_target(
                 return;
             }
             Action::Exit => return,
-            Action::Complete => {
-                terminal.print_completions(&executors.list_targets());
+            Action::Complete(direction) => {
+                if let Some(completions) = completions.as_mut() {
+                    use action::Direction;
+                    if let Some(completion) = match direction {
+                        Direction::Down => completions.select_down(),
+                        Direction::Up => completions.select_up(),
+                    } {
+                        buffer.set_str(completion);
+                        suggester.generate(&buffer);
+                    }
+                } else {
+                    completions = Some(completions::new(
+                        executors
+                            .list_targets()
+                            .iter()
+                            .map(|target| String::from(*target))
+                            .collect(),
+                    ));
+                }
+                terminal.print_completions(completions.as_ref().unwrap());
             }
-            Action::Edit(action) => edit(&action, &mut buffer, &mut suggester),
+            Action::Edit(action) => {
+                edit(&action, &mut buffer, &mut suggester);
+                completions = None;
+                terminal.clear_completions();
+            }
             Action::MoveCursor(scope) => move_cursor(&scope, &mut buffer, &mut suggester),
         }
 

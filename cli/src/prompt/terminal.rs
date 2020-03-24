@@ -67,6 +67,8 @@ impl Terminal {
         self.prompt_start = BASE_PROMPT_SIZE;
 
         let mut stdout = std::io::stdout();
+        self.clear_completions_internal(&mut stdout);
+
         crossterm::queue!(
             stdout,
             crossterm::cursor::MoveToColumn(0),
@@ -189,7 +191,7 @@ impl Terminal {
         self.has_error = true;
     }
 
-    pub(super) fn _clear_completions(&mut self) {
+    pub(super) fn clear_completions(&mut self) {
         if self.completion_lines > 0 {
             let mut stdout = std::io::stdout();
             self.clear_completions_internal(&mut stdout);
@@ -217,30 +219,40 @@ impl Terminal {
         }
     }
 
-    pub(super) fn print_completions<C: std::fmt::Display>(&mut self, completions: &[C]) {
+    pub(super) fn print_completions(&mut self, completions: &super::completions::Completions) {
         let mut stdout = std::io::stdout();
         self.clear_error_internal(&mut stdout);
         self.clear_completions_internal(&mut stdout);
         self.completion_lines = 0;
+        let selected = completions.selected().unwrap_or_else(usize::max_value);
 
-        if !completions.is_empty() {
-            for completion in completions {
-                crossterm::queue!(
-                    stdout,
-                    crossterm::style::Print('\n'),
-                    crossterm::cursor::MoveToColumn(0),
-                    crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                    crossterm::style::Print(completion),
-                );
-                self.completion_lines += 1;
-            }
-
+        for completion in completions.completions() {
             crossterm::queue!(
                 stdout,
-                crossterm::cursor::MoveUp(self.completion_lines),
-                crossterm::cursor::MoveToColumn(self.cursor_position),
+                crossterm::style::Print('\n'),
+                crossterm::cursor::MoveToColumn(0),
+                crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
             );
+
+            if usize::from(self.completion_lines) == selected {
+                crossterm::queue!(
+                    stdout,
+                    crossterm::style::SetAttribute(crossterm::style::Attribute::Bold),
+                    crossterm::style::Print(completion),
+                    crossterm::style::ResetColor,
+                );
+            } else {
+                crossterm::queue!(stdout, crossterm::style::Print(completion));
+            }
+
+            self.completion_lines += 1;
         }
+
+        crossterm::queue!(
+            stdout,
+            crossterm::cursor::MoveUp(self.completion_lines),
+            crossterm::cursor::MoveToColumn(self.cursor_position),
+        );
 
         stdout.flush();
     }

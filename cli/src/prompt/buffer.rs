@@ -31,8 +31,18 @@ impl Buffer {
         &self.data
     }
 
+    pub(super) fn set_str(&mut self, string: &str) {
+        self.clear();
+        self.write_str(string);
+    }
+
     pub(super) fn write_str(&mut self, string: &str) {
         string.chars().for_each(|c| self.write(c));
+    }
+
+    fn clear(&mut self) {
+        self.data.clear();
+        self.position = 0;
     }
 
     fn write(&mut self, c: char) {

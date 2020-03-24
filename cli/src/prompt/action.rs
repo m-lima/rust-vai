@@ -4,7 +4,7 @@ pub(super) enum Action {
     Execute,
     Exit,
     Cancel,
-    Complete,
+    Complete(Direction),
     Noop,
 }
 
@@ -24,6 +24,11 @@ pub(super) enum Scope {
     WordAll,
 }
 
+pub(super) enum Direction {
+    Up,
+    Down,
+}
+
 fn control(e: &crossterm::event::KeyEvent) -> bool {
     e.modifiers == crossterm::event::KeyModifiers::CONTROL
 }
@@ -37,7 +42,8 @@ pub(super) fn read() -> Action {
         Ok(crossterm::event::Event::Key(e)) => match e.code {
             crossterm::event::KeyCode::Enter => Action::Execute,
             crossterm::event::KeyCode::Esc => Action::Cancel,
-            crossterm::event::KeyCode::Tab => Action::Complete,
+            crossterm::event::KeyCode::Tab => Action::Complete(Direction::Down),
+            crossterm::event::KeyCode::BackTab => Action::Complete(Direction::Up),
             crossterm::event::KeyCode::Backspace => Action::Edit(EditAction::Delete(Scope::Back)),
             crossterm::event::KeyCode::Delete => Action::Edit(EditAction::Delete(Scope::Forward)),
             crossterm::event::KeyCode::Right => Action::MoveCursor(Scope::Forward),
