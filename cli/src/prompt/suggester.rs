@@ -15,7 +15,9 @@ impl Suggester {
         &self.data
     }
 
-    pub(super) fn generate(&mut self, buffer: &super::buffer::Buffer) {
+    // Allowed because I disagree with clippy's argument for readability
+    #[allow(clippy::find_map)]
+    pub(super) fn update(&mut self, buffer: &super::buffer::Buffer) {
         if buffer.data_raw().is_empty() {
             self.data.clear();
             return;

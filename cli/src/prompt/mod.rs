@@ -8,48 +8,16 @@ mod navigation;
 mod suggester;
 mod terminal;
 
-fn execute(target: String, buffer: &buffer::Buffer) {
-    let mut args = vec![target];
-    buffer
-        .data()
-        .split_whitespace()
-        .for_each(|arg| args.push(String::from(arg)));
-
-    if let Err(e) = super::execute(args) {
-        terminal::fatal(e);
-    }
-}
-
-// fn edit<F>(
-//     action: &action::EditAction,
-//     buffer: &mut buffer::Buffer,
-//     suggester: &mut suggester::Suggester<F>,
-// ) where
-//     F: Fn(&str) -> Option<String>,
-// {
-//     buffer.edit(&action);
-//     suggester.generate(&buffer);
-// }
+// fn execute(target: String, buffer: &buffer::Buffer) {
+//     let mut args = vec![target];
+//     buffer
+//         .data()
+//         .split_whitespace()
+//         .for_each(|arg| args.push(String::from(arg)));
 //
-// fn move_cursor<F>(
-//     scope: &action::Scope,
-//     buffer: &mut buffer::Buffer,
-//     suggester: &mut suggester::Suggester<F>,
-// ) where
-//     F: Fn(&str) -> Option<String>,
-// {
-//     if buffer.at_end() {
-//         match scope {
-//             action::Scope::Forward | action::Scope::ForwardAll => {
-//                 buffer.write_str(&suggester.take());
-//             }
-//             action::Scope::ForwardWord => {
-//                 buffer.write_str(&suggester.take_next_word());
-//             }
-//             _ => {}
-//         }
+//     if let Err(e) = super::execute(args) {
+//         terminal::fatal(e);
 //     }
-//     buffer.move_cursor(&scope)
 // }
 
 // fn read_query(
@@ -135,8 +103,6 @@ fn execute(target: String, buffer: &buffer::Buffer) {
 // ) {
 //     terminal.prompt(None);
 //     let mut buffer = buffer::new(u16::max_value() - terminal.prompt_size());
-//     // Allowed because I disagree with clippy's argument for readability
-//     #[allow(clippy::find_map)]
 //     let mut suggester = suggester::new(|target| {
 //         executors
 //             .list_targets()
@@ -217,47 +183,30 @@ pub(super) fn run() {
     let mut context = context::new();
 
     loop {
-        terminal.prompt(&context);
+        terminal.prompt(context.target());
         loop {
             use action::Action;
 
-            terminal.print(&buffer, suggester.suggestion());
+            terminal.print(context.buffer(), context.suggester().data());
 
             match action::read() {
                 Action::Noop => continue,
-                Action::Cancel => context.downgrade(),
-                Action::Execute => {}
+                Action::Cancel => {
+                    context.downgrade();
+                    terminal.prompt(context.target());
+                }
                 Action::Exit => return,
-                Action::Complete(direction) => {
-                    if let Some(completions) = completions.as_mut() {
-                        use action::Direction;
-                        if let Some(completion) = match direction {
-                            Direction::Down => completions.select_down(),
-                            Direction::Up => completions.select_up(),
-                        } {
-                            buffer.set_str(completion);
-                            suggester.generate(&buffer);
-                        }
-                    } else {
-                        completions = Some(completions::new(
-                            executors
-                                .list_targets()
-                                .iter()
-                                .map(|target| String::from(*target))
-                                .collect(),
-                        ));
-                    }
-                    terminal.print_completions(completions.as_ref().unwrap());
-                }
-                Action::Edit(action) => {
-                    edit(&action, &mut buffer, &mut suggester);
-                    completions = None;
-                    terminal.clear_completions();
-                }
-                Action::MoveCursor(scope) => move_cursor(&scope, &mut buffer, &mut suggester),
+                Action::Complete(direction) => context.complete(&direction),
+                Action::Edit(action) => context.edit(&action),
+                Action::MoveCursor(scope) => context.cursor(&scope),
+                Action::Execute => match context.upgrade() {
+                    context::UpgradeResult::Done => return,
+                    context::UpgradeResult::Continue => terminal.prompt(context.target()),
+                    context::UpgradeResult::Error(e) => terminal.print_error(e),
+                },
             }
 
-            terminal.clear_error();
+            terminal.print_completions(context.completions());
         }
     }
     // read_target(executors, None);

@@ -13,7 +13,7 @@ pub(super) fn new() -> Buffer {
 pub(super) fn from(data: &str) -> Buffer {
     Buffer {
         data: data.chars().collect(),
-        position: 0,
+        position: data.len(),
     }
 }
 

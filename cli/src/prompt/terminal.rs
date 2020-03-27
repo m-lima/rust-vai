@@ -45,10 +45,6 @@ pub(super) fn new() -> Terminal {
 }
 
 impl Terminal {
-    pub(super) fn prompt_size(&self) -> u16 {
-        self.prompt_start
-    }
-
     // Allowed because we cap at 32
     #[allow(clippy::cast_possible_truncation)]
     fn clip_prompt(prompt: &str) -> (&str, u16) {
@@ -63,11 +59,11 @@ impl Terminal {
         (effective_prompt, size)
     }
 
-    pub(super) fn prompt(&mut self, context: &super::context::Context) {
+    pub(super) fn prompt(&mut self, secondary_prompt: &Option<String>) {
         self.prompt_start = BASE_PROMPT_SIZE;
 
         let mut stdout = std::io::stdout();
-        self.clear_completions_internal(&mut stdout);
+        self.clear_completions(&mut stdout);
 
         crossterm::queue!(
             stdout,
@@ -78,7 +74,7 @@ impl Terminal {
             crossterm::style::ResetColor,
         );
 
-        if let Some(secondary_prompt) = context.target() {
+        if let Some(secondary_prompt) = secondary_prompt {
             let (effective_prompt, size) = Terminal::clip_prompt(secondary_prompt);
 
             self.prompt_start += size;
@@ -98,14 +94,18 @@ impl Terminal {
         self.cursor_position = self.prompt_start;
     }
 
-    // TODO Revisit this (look into position() and how to avoid creating new strings)
     pub(super) fn print(&mut self, buffer: &super::buffer::Buffer, suggestion: &str) {
         let mut width = usize::from(
             crossterm::terminal::size().map_or_else(|_| u16::max_value(), |size| size.0) + 1
                 - self.prompt_start,
         );
         let position = std::cmp::min(*buffer.position(), width);
-        self.cursor_position = self.prompt_start + position as u16;
+
+        // Allowed because we are never larger than `width`
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            self.cursor_position = self.prompt_start + position as u16;
+        }
 
         let mut stdout = std::io::stdout();
         crossterm::queue!(stdout, crossterm::cursor::MoveToColumn(self.prompt_start));
@@ -156,15 +156,7 @@ impl Terminal {
         stdout.flush();
     }
 
-    pub(super) fn clear_error(&mut self) {
-        if self.has_error {
-            let mut stdout = std::io::stdout();
-            self.clear_error_internal(&mut stdout);
-            stdout.flush();
-        }
-    }
-
-    fn clear_error_internal(&mut self, stdout: &mut std::io::Stdout) {
+    fn clear_error(&mut self, stdout: &mut std::io::Stdout) {
         if self.has_error {
             crossterm::queue!(
                 stdout,
@@ -180,7 +172,7 @@ impl Terminal {
     pub(super) fn print_error<M: std::fmt::Display>(&mut self, message: M) {
         let mut stdout = std::io::stdout();
 
-        self.clear_completions_internal(&mut stdout);
+        self.clear_completions(&mut stdout);
         print_error_internal(message, &mut stdout);
 
         crossterm::queue!(
@@ -192,15 +184,7 @@ impl Terminal {
         self.has_error = true;
     }
 
-    pub(super) fn clear_completions(&mut self) {
-        if self.completion_lines > 0 {
-            let mut stdout = std::io::stdout();
-            self.clear_completions_internal(&mut stdout);
-            stdout.flush();
-        }
-    }
-
-    fn clear_completions_internal(&mut self, stdout: &mut std::io::Stdout) {
+    fn clear_completions(&mut self, stdout: &mut std::io::Stdout) {
         if self.completion_lines > 0 {
             for _ in 0..self.completion_lines {
                 crossterm::queue!(
@@ -220,40 +204,46 @@ impl Terminal {
         }
     }
 
-    pub(super) fn print_completions(&mut self, completions: &super::completions::Completions) {
+    pub(super) fn print_completions(
+        &mut self,
+        completions: &Option<super::completions::Completions>,
+    ) {
         let mut stdout = std::io::stdout();
-        self.clear_error_internal(&mut stdout);
-        self.clear_completions_internal(&mut stdout);
+        self.clear_error(&mut stdout);
+        self.clear_completions(&mut stdout);
         self.completion_lines = 0;
-        let selected = completions.selected().unwrap_or_else(usize::max_value);
 
-        for completion in completions.data() {
-            crossterm::queue!(
-                stdout,
-                crossterm::style::Print('\n'),
-                crossterm::cursor::MoveToColumn(0),
-                crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-            );
+        if let Some(completions) = completions {
+            let selected = completions.selected().unwrap_or_else(usize::max_value);
 
-            if usize::from(self.completion_lines) == selected {
+            for completion in completions.data() {
                 crossterm::queue!(
                     stdout,
-                    crossterm::style::SetAttribute(crossterm::style::Attribute::Bold),
-                    crossterm::style::Print(completion),
-                    crossterm::style::ResetColor,
+                    crossterm::style::Print('\n'),
+                    crossterm::cursor::MoveToColumn(0),
+                    crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
                 );
-            } else {
-                crossterm::queue!(stdout, crossterm::style::Print(completion));
+
+                if usize::from(self.completion_lines) == selected {
+                    crossterm::queue!(
+                        stdout,
+                        crossterm::style::SetAttribute(crossterm::style::Attribute::Bold),
+                        crossterm::style::Print(completion),
+                        crossterm::style::ResetColor,
+                    );
+                } else {
+                    crossterm::queue!(stdout, crossterm::style::Print(completion));
+                }
+
+                self.completion_lines += 1;
             }
 
-            self.completion_lines += 1;
+            crossterm::queue!(
+                stdout,
+                crossterm::cursor::MoveUp(self.completion_lines),
+                crossterm::cursor::MoveToColumn(self.cursor_position),
+            );
         }
-
-        crossterm::queue!(
-            stdout,
-            crossterm::cursor::MoveUp(self.completion_lines),
-            crossterm::cursor::MoveToColumn(self.cursor_position),
-        );
 
         stdout.flush();
     }
