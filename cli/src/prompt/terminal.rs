@@ -94,12 +94,12 @@ impl Terminal {
         self.cursor_position = self.prompt_start;
     }
 
-    pub(super) fn print(&mut self, context: &super::Context) {
+    pub(super) fn print(&mut self, context: &super::context::Context) {
         let mut width = usize::from(
             crossterm::terminal::size().map_or_else(|_| u16::max_value(), |size| size.0) + 1
                 - self.prompt_start,
         );
-        let position = std::cmp::min(*context.buffer.position(), width);
+        let position = std::cmp::min(*context.buffer().position(), width);
 
         // Allowed because we are never larger than `width`
         #[allow(clippy::cast_possible_truncation)]
@@ -107,9 +107,9 @@ impl Terminal {
             self.cursor_position = self.prompt_start + position as u16;
         }
 
-        self.print_buffer(&context.buffer, &mut width, position);
-        self.print_suggester(&context.suggester, width);
-        self.print_completions(&context.completions);
+        self.print_buffer(context.buffer(), &mut width, position);
+        self.print_suggester(context.suggester(), width);
+        self.print_completions(context.completions());
 
         crossterm::queue!(
             self.stdout,

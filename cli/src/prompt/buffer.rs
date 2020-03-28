@@ -10,13 +10,13 @@ pub(super) fn new() -> Buffer {
     }
 }
 
-pub(super) fn from(target: &str, buffer: Buffer) -> Buffer {
+pub(super) fn from(target: &str, buffer: &Buffer) -> Buffer {
     let mut data = target.chars().collect::<Vec<_>>();
     data.push(' ');
-    data.extend(buffer.data);
+    data.extend(&buffer.data);
     Buffer {
         data,
-        position: buffer.position + target.len() + 2,
+        position: buffer.position + target.len() + 1,
     }
 }
 
