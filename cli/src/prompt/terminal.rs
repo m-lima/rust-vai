@@ -61,10 +61,8 @@ fn clip_prompt(prompt: &str) -> (&str, u16) {
 }
 
 impl Terminal {
-    pub(super) fn set_prompt(&mut self, secondary_prompt: &Option<&str>) {
+    pub(super) fn set_prompt(&mut self, secondary_prompt: Option<&str>) {
         self.prompt_start = BASE_PROMPT_SIZE;
-
-        self.clear_completions();
 
         crossterm::queue!(
             self.stdout,

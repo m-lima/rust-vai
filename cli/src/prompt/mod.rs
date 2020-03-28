@@ -18,7 +18,7 @@ fn read_query(
 ) {
     let executor = executors.find(target).unwrap();
     let mut context = context::new(buffer, executor.history().unwrap_or_else(|_| vec![]));
-    terminal.set_prompt(&Some(target));
+    terminal.set_prompt(Some(target));
 
     loop {
         use action::Action;
@@ -68,7 +68,7 @@ fn read_target(
             .map(|suggestion| String::from(*suggestion))
             .collect(),
     );
-    terminal.set_prompt(&None);
+    terminal.set_prompt(None);
 
     loop {
         use action::Action;
