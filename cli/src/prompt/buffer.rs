@@ -1,22 +1,28 @@
 pub(super) struct Buffer {
-    max_size: usize,
     data: Vec<char>,
     position: usize,
 }
 
-pub(super) fn new(max_size: u16) -> Buffer {
+pub(super) fn new() -> Buffer {
     Buffer {
-        max_size: usize::from(max_size),
         data: Vec::new(),
         position: 0,
     }
 }
 
+pub(super) fn from(target: &str, buffer: &Buffer) -> Buffer {
+    let mut data = target.chars().collect::<Vec<_>>();
+    data.push(' ');
+    data.extend(&buffer.data);
+    Buffer {
+        data,
+        position: buffer.position + target.len() + 1,
+    }
+}
+
 impl Buffer {
-    // Allowed because it is guarded in the `write` method
-    #[allow(clippy::cast_possible_truncation)]
-    pub(super) fn position(&self) -> u16 {
-        self.position as u16
+    pub(super) fn position(&self) -> &usize {
+        &self.position
     }
 
     pub(super) fn at_end(&self) -> bool {
@@ -40,16 +46,45 @@ impl Buffer {
         string.chars().for_each(|c| self.write(c));
     }
 
+    pub(super) fn extract_first_word(&self) -> Option<(String, Self)> {
+        if self.data.is_empty() {
+            None
+        } else {
+            let index = super::navigation::next_word(0, &self.data);
+            if index == 0 {
+                None
+            } else {
+                let first_word = self.data[0..index]
+                    .iter()
+                    .collect::<String>()
+                    .trim()
+                    .to_string();
+                Some((
+                    first_word,
+                    Self {
+                        data: self.data[index..self.data.len()]
+                            .iter()
+                            .map(std::clone::Clone::clone)
+                            .collect(),
+                        position: if self.position < index {
+                            0
+                        } else {
+                            self.position - index
+                        },
+                    },
+                ))
+            }
+        }
+    }
+
     fn clear(&mut self) {
         self.data.clear();
         self.position = 0;
     }
 
     fn write(&mut self, c: char) {
-        if self.data.len() < self.max_size {
-            self.data.insert(self.position, c);
-            self.position += 1;
-        }
+        self.data.insert(self.position, c);
+        self.position += 1;
     }
 
     fn delete(&mut self, scope: &super::action::Scope) {

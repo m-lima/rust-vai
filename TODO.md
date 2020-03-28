@@ -23,6 +23,9 @@
   [ ] Review performance of wide inputs
   [ ] Hard to tell if there is a suggestion on wide input
   [ ] ***Multi-line completions***
+  [ ] Sort completions by relevance
+  [ ] Single completion simply updates buffer
+  [X] Terminal only queues by default. Only print flushes
 
 ## UI
   [ ] Make UI
