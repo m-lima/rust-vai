@@ -10,10 +10,13 @@ pub(super) fn new() -> Buffer {
     }
 }
 
-pub(super) fn from(data: &str) -> Buffer {
+pub(super) fn from(target: &str, buffer: Buffer) -> Buffer {
+    let mut data = target.chars().collect::<Vec<_>>();
+    data.push(' ');
+    data.extend(buffer.data);
     Buffer {
-        data: data.chars().collect(),
-        position: data.len(),
+        data,
+        position: buffer.position + target.len() + 2,
     }
 }
 
@@ -41,6 +44,37 @@ impl Buffer {
 
     pub(super) fn write_str(&mut self, string: &str) {
         string.chars().for_each(|c| self.write(c));
+    }
+
+    pub(super) fn extract_first_word(&self) -> Option<(String, Self)> {
+        if self.data.is_empty() {
+            None
+        } else {
+            let index = super::navigation::next_word(0, &self.data);
+            if index == 0 {
+                None
+            } else {
+                let first_word = self.data[0..index]
+                    .iter()
+                    .collect::<String>()
+                    .trim()
+                    .to_string();
+                Some((
+                    first_word,
+                    Self {
+                        data: self.data[index..self.data.len()]
+                            .iter()
+                            .map(std::clone::Clone::clone)
+                            .collect(),
+                        position: if self.position < index {
+                            0
+                        } else {
+                            self.position - index
+                        },
+                    },
+                ))
+            }
+        }
     }
 
     fn clear(&mut self) {
