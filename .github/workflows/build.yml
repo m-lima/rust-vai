@@ -23,14 +23,14 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: --verbose --workspace --all-features
+        args: --verbose --workspace --all-features --all-targets
     - name: Lint
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        args: --verbose --workspace --all-features
+        args: --verbose --workspace --all-features --all-targets
     - name: Test
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --no-fail-fast --all --all-features -- --nocapture
+        args: --verbose --workspace --all-features --all-targets --no-fail-fast -- --nocapture
