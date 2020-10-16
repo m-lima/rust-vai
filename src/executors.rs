@@ -44,6 +44,7 @@ impl PartialOrd for FuzzyMatch {
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Executor {
     name: String,
+    alias: String,
     command: String,
     suggestion: String,
     parser: parser::Parser,
@@ -53,6 +54,7 @@ impl Executor {
     fn clean_up_name(self) -> Self {
         Self {
             name: self.name.to_lowercase(),
+            alias: self.alias.to_lowercase(),
             command: self.command,
             suggestion: self.suggestion,
             parser: self.parser,
@@ -318,11 +320,21 @@ impl Executors {
     #[must_use]
     pub fn find(&self, name: &str) -> Option<&Executor> {
         let lower_case_name = name.to_lowercase();
+
+        // Try full names first
         for executor in self.executors() {
             if executor.name == lower_case_name {
                 return Some(executor);
             }
         }
+
+        // Then try aliases
+        for executor in self.executors() {
+            if executor.alias == lower_case_name {
+                return Some(executor);
+            }
+        }
+
         None
     }
 }

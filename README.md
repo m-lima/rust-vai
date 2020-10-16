@@ -17,6 +17,7 @@ $ vai youtube rust jon gjengset
 | Field        | Description |
 | ------------ | -------------|
 | `name`       | Name of the target, referenced when calling `vai` |
+| `alias`      | Alias for the target, usually shorter than `name` |
 | `command`    | URL to use when calling the browser for this target. Query will be appended to it |
 | `suggestion` | URL to use for suggestions from the target. Query will be appended to it |
 | `parser`     | How to parse the suggestions. One of `GOOGLE`, `DUCK`, `NONE` |
@@ -33,30 +34,35 @@ $ cat config.json | vai -r
 [
   {
     "name": "start",
+    "alias": "s",
     "command": "https://www.startpage.com/sp/search?t=blak&lui=english&language=english&cat=web&query=",
     "suggestion": "https://suggestqueries.google.com/complete/search?output=firefox&q=",
     "parser": "GOOGLE"
   },
   {
     "name": "google",
+    "alias": "g",
     "command": "https://www.google.com/search?q=",
     "suggestion": "https://suggestqueries.google.com/complete/search?output=firefox&q=",
     "parser": "GOOGLE"
   },
   {
     "name": "duck",
+    "alias": "d",
     "command": "https://duckduckgo.com/?q=",
     "suggestion": "https://duckduckgo.com/ac/?q=",
     "parser": "DUCK"
   },
   {
     "name": "youtube",
+    "alias": "y",
     "command": "https://youtube.com/results?search_query=",
     "suggestion": "",
     "parser": "NONE"
   },
   {
     "name": "image",
+    "alias": "i",
     "command": "https://www.google.com/search?tbm=isch&q=",
     "suggestion": "https://suggestqueries.google.com/complete/search?output=firefox&q=",
     "parser": "GOOGLE"
