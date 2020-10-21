@@ -1,3 +1,7 @@
+use vai_core as core;
+
+use crate::Result;
+
 pub(super) enum Flag {
     Help,
     Write,
@@ -8,7 +12,7 @@ pub(super) enum Flag {
 }
 
 impl Flag {
-    pub(super) fn short(&self) -> &'static str {
+    fn short(&self) -> &'static str {
         match self {
             Flag::Write => "-w",
             Flag::Read => "-r",
@@ -19,7 +23,7 @@ impl Flag {
         }
     }
 
-    pub(super) fn long(&self) -> &'static str {
+    fn long(&self) -> &'static str {
         match self {
             Flag::Write => "--write",
             Flag::Read => "--read",
@@ -30,7 +34,7 @@ impl Flag {
         }
     }
 
-    pub(super) fn description(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         match self {
             Flag::Write => "Write saved configuration to stdout",
             Flag::Read => "Read configuration from stdin and save",
@@ -39,6 +43,16 @@ impl Flag {
             Flag::Help => "Display usage message",
             Flag::Unknown(_) => "",
         }
+    }
+
+    fn values() -> Vec<Flag> {
+        vec![
+            Flag::Write,
+            Flag::Read,
+            Flag::Targets,
+            Flag::Suggest,
+            Flag::Help,
+        ]
     }
 }
 
@@ -55,12 +69,62 @@ impl std::convert::From<&str> for Flag {
     }
 }
 
-pub(super) fn values() -> Vec<Flag> {
-    vec![
-        Flag::Write,
-        Flag::Read,
-        Flag::Targets,
-        Flag::Suggest,
-        Flag::Help,
-    ]
+pub(super) fn print_usage() -> Result {
+    let name = application_name();
+
+    println!("Usage:");
+    println!("    {} [target] [query]", name);
+    println!("    {} <option>", name);
+    println!();
+
+    println!("Arguments:");
+    println!(
+        "    target          Which target to query{}",
+        list_targets()
+    );
+    println!("    query           Query string for <target>");
+    println!();
+
+    println!("Options:");
+    for flag in Flag::values() {
+        println!(
+            "    {}, {:<12}{}",
+            flag.short(),
+            flag.long(),
+            flag.description()
+        );
+    }
+    println!();
+
+    println!("If no parameters are provided, the prompt user interface will be invoked");
+
+    Ok(())
+}
+
+fn list_targets() -> String {
+    if let Some(targets) = core::executors::load_default()
+        .ok()
+        .map(|e| {
+            e.list_targets()
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        })
+        .filter(|t| !t.is_empty())
+    {
+        format!(" [{}]", targets.join(" "))
+    } else {
+        String::new()
+    }
+}
+
+fn application_name() -> String {
+    (|| {
+        std::env::current_exe()
+            .ok()?
+            .file_stem()?
+            .to_str()
+            .map(String::from)
+    })()
+    .unwrap_or_else(|| String::from(env!("CARGO_PKG_NAME")))
 }

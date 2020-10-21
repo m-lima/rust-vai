@@ -12,15 +12,34 @@ $ # Now you can just use it!
 $ vai youtube rust jon gjengset
 ```
 
+#### Running without installing
+```bash
+$ git clone https://github.com/m-lima/rust-vai
+$ cd rust-vai/cli
+$ # Load the default configuration
+$ cat config.json | cargo run --manifest-path cli/Cargo.toml -- -r
+$ # Now you can run normally
+$ cd cli
+$ cargo run
+```
+
 ## Configuration
 
-| Field        | Description |
-| ------------ | -------------|
-| `name`       | Name of the target, referenced when calling `vai` |
-| `alias`      | Alias for the target, usually shorter than `name` |
+| Field        | Description                                                                       |
+| ------------ | --------------------------------------------------------------------------------- |
+| `name`       | Name of the target, referenced when calling `vai`                                 |
+| `alias`      | Alias for the target, usually shorter than `name`                                 |
 | `command`    | URL to use when calling the browser for this target. Query will be appended to it |
-| `suggestion` | URL to use for suggestions from the target. Query will be appended to it |
-| `parser`     | How to parse the suggestions. One of `GOOGLE`, `DUCK`, `NONE` |
+| `suggestion` | URL to use for suggestions from the target. Query will be appended to it          |
+| `parser`     | How to parse the suggestions. One of `GOOGLE`, `DUCK`, `NONE`                     |
+
+The configuration is kept in an application specific config directory:
+
+|Platform | Value                                 | Example                          |
+| ------- | ------------------------------------- | -------------------------------- |
+| Linux   | `$XDG_CONFIG_HOME` or `$HOME`/.config | /home/alice/.config              |
+| macOS   | `$HOME`/Library/Preferences           | /Users/Alice/Library/Preferences |
+| Windows | `{FOLDERID_RoamingAppData}`           | C:\Users\Alice\AppData\Roaming   |
 
 #### Quick setup
 You can load a JSON configuration to `vai` directly using the `-r` flag

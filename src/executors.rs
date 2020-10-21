@@ -77,6 +77,12 @@ impl Executor {
         std::fs::write(&path, data).map_err(|_| error::write(path))
     }
 
+    /// Returns the name associated with this executor
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     /// Executes the query by calling the default browser
     ///
     /// # Arguments
@@ -160,7 +166,7 @@ impl Executor {
     /// * If response is not 200 OK, then [`Error(Fetch)`](../error/struct.Error.html)
     /// * If response cannot be parsed, then [`Error(Parse)`](../error/struct.Error.html)
     pub fn suggest(&self, query: &str) -> Result<Vec<String>> {
-        if query.len() < 3 || self.suggestion.is_empty() || self.parser == parser::Parser::NONE {
+        if query.len() < 3 || self.suggestion.is_empty() || self.parser == parser::Parser::None {
             return Ok(vec![]);
         }
 

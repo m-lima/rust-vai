@@ -4,17 +4,19 @@
 
 use vai_core as core;
 
+mod executor;
 mod flag;
-mod prompt;
+mod support;
 
 type Result<T = ()> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum Error {
     NoQuery,
     UnknownTarget,
     UnknownCommand(String),
     Core(core::error::Error),
+    Rucline(rucline::Error),
 }
 
 impl std::error::Error for Error {}
@@ -25,6 +27,12 @@ impl std::convert::From<core::error::Error> for Error {
     }
 }
 
+impl std::convert::From<rucline::Error> for Error {
+    fn from(error: rucline::Error) -> Self {
+        Self::Rucline(error)
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match self {
@@ -32,160 +40,26 @@ impl std::fmt::Display for Error {
             Error::UnknownTarget => write!(fmt, "Unrecognized target"),
             Error::UnknownCommand(command) => write!(fmt, "Unrecognized command: {}", command),
             Error::Core(err) => write!(fmt, "{}", err),
+            Error::Rucline(err) => write!(fmt, "{}", err),
         }
     }
 }
 
 #[derive(Debug, Eq, PartialEq)]
 enum Mode {
-    Interactive,
-    Command(Vec<String>),
+    Support(Vec<String>),
     Execute(Vec<String>),
-}
-
-fn extract_query(args: Vec<String>, index: usize) -> Result<String> {
-    if args.len() <= index {
-        Err(Error::NoQuery)
-    } else {
-        Ok(args
-            .into_iter()
-            .skip(index)
-            .collect::<Vec<String>>()
-            .join(" "))
-    }
-}
-
-fn application_name() -> String {
-    (|| {
-        std::env::current_exe()
-            .ok()?
-            .file_stem()?
-            .to_str()
-            .map(String::from)
-    })()
-    .unwrap_or_else(|| String::from(env!("CARGO_PKG_NAME")))
-}
-
-fn print_usage() -> Result {
-    let name = application_name();
-
-    println!("Usage:          {} <target> <query>", name);
-    println!("                {} <option>", name);
-    println!("                {}", name);
-    println!();
-    println!("Arguments:");
-    print!("target          Which target to query");
-
-    match core::executors::load_default() {
-        Ok(executors) => {
-            print!(" [ ");
-            for executor in executors.list_targets() {
-                print!("{} ", executor);
-            }
-            println!("]");
-        }
-        Err(_) => println!(),
-    }
-
-    println!("query           Query string for <target>");
-    println!();
-    println!("Options:");
-
-    for flag in flag::values() {
-        println!(
-            "{}, {:<12}{}",
-            flag.short(),
-            flag.long(),
-            flag.description()
-        );
-    }
-    println!();
-    println!("If no parameters are provided, the prompt user interface will be invoked");
-
-    Ok(())
-}
-
-fn print_targets() -> Result {
-    core::executors::load_default()?
-        .list_targets()
-        .into_iter()
-        .for_each(|target| println!("{}", target));
-    Ok(())
-}
-
-fn support(args: Vec<String>) -> Result {
-    match args[0].as_str().into() {
-        flag::Flag::Help => print_usage(),
-        flag::Flag::Write => core::executors::load_default()?
-            .to_json()
-            .map(|json| println!("{}", json))
-            .map_err(Error::from),
-        flag::Flag::Read => core::executors::load_from_stdin()?
-            .save_default()
-            .map_err(Error::from),
-        flag::Flag::Targets => print_targets(),
-        flag::Flag::Suggest => {
-            if args.len() < 2 {
-                print_targets()
-            } else {
-                let executors = core::executors::load_default()?;
-                if let Some(target) = executors.find(&args[1]) {
-                    let query = match extract_query(args, 2) {
-                        Ok(query) => query,
-                        Err(_) => return Ok(()),
-                    };
-
-                    target
-                        .suggest(&query)
-                        .unwrap_or_else(|_| vec![])
-                        .into_iter()
-                        .for_each(|entry| println!("{}", entry));
-                    target
-                        .fuzzy_history(&query, 10)
-                        .unwrap_or_else(|_| vec![])
-                        .into_iter()
-                        .for_each(|entry| println!("{}", entry));
-                    Ok(())
-                } else {
-                    let possible_targets = executors
-                        .list_targets()
-                        .into_iter()
-                        .filter(|target| target.starts_with(&args[1]))
-                        .collect::<Vec<_>>();
-                    if possible_targets.is_empty() {
-                        Err(Error::UnknownTarget)
-                    } else {
-                        for possible_target in possible_targets {
-                            println!("{}", possible_target);
-                        }
-                        Ok(())
-                    }
-                }
-            }
-        }
-        flag::Flag::Unknown(command) => Err(Error::UnknownCommand(command)),
-    }
-}
-
-pub(crate) fn execute(args: Vec<String>) -> Result {
-    core::executors::load_default()?
-        .find(&args[0])
-        .ok_or_else(|| Error::UnknownTarget)?
-        .execute(&extract_query(args, 1)?)
-        .map_err(Error::from)
 }
 
 fn select_mode<I: std::iter::Iterator<Item = String>>(input: I) -> Mode {
     let args = input
         .skip(1)
-        .map(|s| s.trim().to_string())
+        .map(|s| String::from(s.trim()))
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>();
 
-    if args.is_empty() {
-        Mode::Interactive
-    } else if args[0].starts_with('-') {
-        Mode::Command(args)
+    if !args.is_empty() && args[0].starts_with('-') {
+        Mode::Support(args)
     } else {
         Mode::Execute(args)
     }
@@ -193,15 +67,8 @@ fn select_mode<I: std::iter::Iterator<Item = String>>(input: I) -> Mode {
 
 fn main() {
     match select_mode(std::env::args()) {
-        Mode::Interactive => {
-            if atty::is(atty::Stream::Stdout) {
-                return prompt::run();
-            } else {
-                unimplemented!("No GUI yet");
-            }
-        }
-        Mode::Command(args) => support(args),
-        Mode::Execute(args) => execute(args),
+        Mode::Support(args) => support::support(args),
+        Mode::Execute(args) => executor::execute(args),
     }
     .unwrap_or_else(|err| {
         eprintln!("{}", err);
@@ -211,7 +78,8 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::select_mode;
+    use super::Mode::{Execute, Support};
 
     macro_rules! args {
         ($($x:expr),*) => (
@@ -219,28 +87,30 @@ mod tests {
         );
     }
 
-    fn param(param: &str) -> Vec<String> {
-        vec![String::from(param)]
+    macro_rules! param {
+        ($($l:literal),*) => {
+            vec![$($l.to_string()),*]
+        };
     }
 
     #[test]
     fn test_prompt_mode() {
-        assert_eq!(select_mode(args!["", ""]), Mode::Interactive);
-        assert_eq!(select_mode(args!["     "]), Mode::Interactive);
-        assert_eq!(select_mode(args!["     ", "", ""]), Mode::Interactive);
+        assert_eq!(select_mode(args!["", ""]), Execute(param!()));
+        assert_eq!(select_mode(args!["     "]), Execute(param!()));
+        assert_eq!(select_mode(args!["     ", "", ""]), Execute(param!()));
     }
 
     #[test]
     fn test_command_mode() {
-        assert_eq!(select_mode(args!["", "-"]), Mode::Command(param("-")));
-        assert_eq!(select_mode(args!["  -  "]), Mode::Command(param("-")));
-        assert_eq!(select_mode(args!["  ", "", "-"]), Mode::Command(param("-")));
+        assert_eq!(select_mode(args!["", "-"]), Support(param!("-")));
+        assert_eq!(select_mode(args!["  -  "]), Support(param!("-")));
+        assert_eq!(select_mode(args!["  ", "", "-"]), Support(param!("-")));
     }
 
     #[test]
     fn test_execution_mode() {
-        assert_eq!(select_mode(args!["", "a"]), Mode::Execute(param("a")));
-        assert_eq!(select_mode(args!["  a  "]), Mode::Execute(param("a")));
-        assert_eq!(select_mode(args!["  ", "", "a"]), Mode::Execute(param("a")));
+        assert_eq!(select_mode(args!["", "a"]), Execute(param!("a")));
+        assert_eq!(select_mode(args!["  a  "]), Execute(param!("a")));
+        assert_eq!(select_mode(args!["  ", "", "a"]), Execute(param!("a")));
     }
 }
