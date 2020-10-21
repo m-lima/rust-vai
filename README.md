@@ -16,11 +16,7 @@ $ vai youtube rust jon gjengset
 ```bash
 $ git clone https://github.com/m-lima/rust-vai
 $ cd rust-vai/cli
-$ # Load the default configuration
-$ cat config.json | cargo run --manifest-path cli/Cargo.toml -- -r
-$ # Now you can run normally
-$ cd cli
-$ cargo run
+$ VAI_CONFIG=.. cargo run
 ```
 
 ## Configuration
@@ -33,7 +29,7 @@ $ cargo run
 | `suggestion` | URL to use for suggestions from the target. Query will be appended to it          |
 | `parser`     | How to parse the suggestions. One of `GOOGLE`, `DUCK`, `NONE`                     |
 
-The configuration is kept in an application specific config directory:
+When loaded into `vai`, the configuration is kept in an application specific config directory:
 
 |Platform | Value                                 | Example                          |
 | ------- | ------------------------------------- | -------------------------------- |
