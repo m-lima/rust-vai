@@ -5,7 +5,10 @@ use crate::{Error, Result};
 
 pub(super) fn support(args: Vec<String>) -> Result {
     match args[0].as_str().into() {
-        flag::Flag::Help => flag::print_usage(),
+        flag::Flag::Help => {
+            flag::print_usage();
+            Ok(())
+        }
         flag::Flag::Write => core::executors::load_default()?
             .to_json()
             .map(|json| println!("{}", json))

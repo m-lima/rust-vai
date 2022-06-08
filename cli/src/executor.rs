@@ -29,10 +29,9 @@ fn move_cursor_to_executor(buffer: &mut rucline::Buffer) {
 }
 
 fn extract_trailing_buffer(buffer: &str) -> rucline::Buffer {
-    buffer
-        .find(' ')
-        .map(|index| buffer[index..].trim_start().into())
-        .unwrap_or_else(rucline::Buffer::new)
+    buffer.find(' ').map_or_else(rucline::Buffer::new, |index| {
+        buffer[index..].trim_start().into()
+    })
 }
 
 fn interactive_prompt(
@@ -61,7 +60,7 @@ fn interactive_prompt(
                         .suggest(b)
                         .unwrap_or_else(|_| Vec::new())
                         .into_iter()
-                        .map(|s| s.into())
+                        .map(std::convert::Into::into)
                         .collect()
                 };
 
@@ -80,13 +79,11 @@ fn interactive_prompt(
                         continue;
                     }
                 }
-            } else {
-                buffer = trimmed.into();
-                continue;
             }
-        } else {
-            return Ok(());
+            buffer = trimmed.into();
+            continue;
         }
+        return Ok(());
     }
 }
 

@@ -1,7 +1,5 @@
 use vai_core as core;
 
-use crate::Result;
-
 pub(super) enum Flag {
     Help,
     Write,
@@ -69,7 +67,7 @@ impl std::convert::From<&str> for Flag {
     }
 }
 
-pub(super) fn print_usage() -> Result {
+pub(super) fn print_usage() {
     let name = application_name();
 
     println!("Usage:");
@@ -97,8 +95,6 @@ pub(super) fn print_usage() -> Result {
     println!();
 
     println!("If no parameters are provided, the prompt user interface will be invoked");
-
-    Ok(())
 }
 
 fn list_targets() -> String {
