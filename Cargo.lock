@@ -802,6 +802,7 @@ dependencies = [
  "fuzzy-matcher",
  "serde",
  "serde_json",
+ "thiserror",
  "ureq",
  "webbrowser",
 ]

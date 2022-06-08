@@ -27,10 +27,7 @@ impl<'a> serde::Deserialize<'a> for Google {
         impl<'a> serde::de::Visitor<'a> for Visitor {
             type Value = Google;
 
-            fn expecting(
-                &self,
-                fmt: &mut serde::export::Formatter<'_>,
-            ) -> std::result::Result<(), serde::export::fmt::Error> {
+            fn expecting(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(fmt, "an array with: the query and an array of suggestions")
             }
 
@@ -72,11 +69,11 @@ impl DuckPhrase {
 pub fn parse(parser: &Parser, result: &str) -> Result<Vec<String>> {
     match parser {
         Parser::Google => Ok(serde_json::from_str::<Google>(result)
-            .map_err(error::parse)?
+            .map_err(|e| error::Error::Parse(Box::new(e)))?
             .0),
         Parser::Duck => Ok(serde_json::from_str::<Duck>(result)
             .map(Duck::phrases)
-            .map_err(error::parse)?
+            .map_err(|e| error::Error::Parse(Box::new(e)))?
             .into_iter()
             .map(DuckPhrase::phrase)
             .collect()),

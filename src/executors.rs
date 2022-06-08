@@ -11,11 +11,12 @@ const CONFIG_FILE: &str = "config";
 struct FuzzyMatch(i64, String);
 
 impl FuzzyMatch {
-    fn new(choice: String, pattern: &str) -> Option<Self> {
-        Some(Self(
-            fuzzy_matcher::skim::fuzzy_match(choice.as_str(), pattern)?,
-            choice,
-        ))
+    fn new(
+        choice: String,
+        pattern: &str,
+        fuzzy: &impl fuzzy_matcher::FuzzyMatcher,
+    ) -> Option<Self> {
+        Some(Self(fuzzy.fuzzy_match(choice.as_str(), pattern)?, choice))
     }
 
     #[inline]
@@ -74,7 +75,7 @@ impl Executor {
                     .join("\n")
             });
         let data = format!("{}\n{}\n", query, history);
-        std::fs::write(&path, data).map_err(|_| error::write(path))
+        std::fs::write(&path, data).map_err(|e| error::Error::Write(path, e))
     }
 
     /// Returns the name associated with this executor
@@ -95,7 +96,7 @@ impl Executor {
     /// * If the history cannot be saved, then [`Error(Write)`](../error/struct.Error.html)
     pub fn execute(&self, query: &str) -> Result {
         let url = format!("{}{}", &self.command, query);
-        webbrowser::open(url.as_str()).map_err(|_| error::browser(url))?;
+        webbrowser::open(url.as_str()).map_err(error::Error::Browser)?;
         self.save_history(query)
     }
 
@@ -134,6 +135,7 @@ impl Executor {
 
         let path =
             default_path().map(|path| path.join(format!("{}{}", HISTORY_PREFIX, self.name)))?;
+        let fuzzy = fuzzy_matcher::skim::SkimMatcherV2::default();
         std::fs::OpenOptions::new()
             .write(false)
             .read(true)
@@ -141,10 +143,10 @@ impl Executor {
             .map(std::io::BufReader::new)
             .map(std::io::BufReader::lines)
             .map(|lines| {
-                let mut completions: Vec<FuzzyMatch> = lines
+                let mut completions = lines
                     .filter_map(std::result::Result::ok)
-                    .filter_map(|line| FuzzyMatch::new(line, &query))
-                    .collect();
+                    .filter_map(|line| FuzzyMatch::new(line, query, &fuzzy))
+                    .collect::<Vec<_>>();
                 completions.sort_unstable();
                 completions
                     .into_iter()
@@ -171,11 +173,10 @@ impl Executor {
         }
 
         let result = {
-            let response = ureq::get(format!("{}{}", self.suggestion, query).as_str()).call();
-            if !response.ok() {
-                return Err(error::fetch(response.status()));
-            }
-            response.into_string().map_err(error::parse)?
+            let response = ureq::get(format!("{}{}", self.suggestion, query).as_str()).call()?;
+            response
+                .into_string()
+                .map_err(|e| error::Error::Parse(Box::new(e)))?
         };
 
         parser::parse(&self.parser, &result)
@@ -213,7 +214,7 @@ fn default_path() -> Result<std::path::PathBuf> {
         .map(std::path::PathBuf::from)
         .or_else(|_| match dirs::config_dir() {
             Some(path) => Ok(path.join("vai")),
-            None => Err(error::path()),
+            None => Err(error::Error::Path),
         })
 }
 
@@ -233,11 +234,11 @@ fn default_path() -> Result<std::path::PathBuf> {
 pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
     bincode::deserialize(
         std::fs::read(&path)
-            .map_err(|_| error::read(path))?
+            .map_err(|e| error::Error::Read(path.as_ref().into(), e))?
             .as_slice(),
     )
     .map(Executors)
-    .map_err(error::deserialize)
+    .map_err(|e| error::Error::Deserialize(Box::new(e)))
 }
 
 /// Creates a new [`Executors`](struct.Executors.html) based on the json provided through `std::io::stdin`
@@ -249,8 +250,8 @@ pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
 ///
 /// If the json provided cannot be deserialized, then [`Error(Deserialize)`](../error/struct.Error.html)
 pub fn load_from_stdin() -> Result<Executors> {
-    let executors: Vec<Executor> =
-        serde_json::from_reader(std::io::stdin()).map_err(error::deserialize)?;
+    let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())
+        .map_err(|e| error::Error::Deserialize(Box::new(e)))?;
     Ok(Executors(
         executors.into_iter().map(Executor::clean_up_name).collect(),
     ))
@@ -303,10 +304,11 @@ impl Executors {
     /// [`save(path)`](#method.save_default)
     pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result {
         if let Some(parent) = path.as_ref().parent() {
-            std::fs::create_dir_all(&parent).map_err(|_| error::write(&parent))?;
+            std::fs::create_dir_all(&parent).map_err(|e| error::Error::Write(parent.into(), e))?;
         }
-        let bytes = bincode::serialize(self.executors()).map_err(error::serialize)?;
-        std::fs::write(&path, bytes).map_err(|_| error::write(&path))
+        let bytes = bincode::serialize(self.executors())
+            .map_err(|e| error::Error::Serialize(Box::new(e)))?;
+        std::fs::write(&path, bytes).map_err(|e| error::Error::Write(path.as_ref().into(), e))
     }
 
     /// Output this `Executor` as a json representation
@@ -315,7 +317,7 @@ impl Executors {
     ///
     /// * If the configuration cannot be serialized, then [`Error(Serialize)`](../error/struct.Error.html)
     pub fn to_json(&self) -> Result<String> {
-        serde_json::to_string_pretty(&self).map_err(error::serialize)
+        serde_json::to_string_pretty(&self).map_err(|e| error::Error::Serialize(Box::new(e)))
     }
 
     /// Get the target that matches the provided `name`
