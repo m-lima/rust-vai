@@ -176,7 +176,8 @@ impl Executor {
             let response = ureq::get(format!("{}{}", self.suggestion, query).as_str()).call()?;
             response
                 .into_string()
-                .map_err(|e| error::Error::Parse(Box::new(e)))?
+                .map_err(error::Parse::from)
+                .map_err(error::Error::Parse)?
         };
 
         parser::parse(&self.parser, &result)
@@ -238,7 +239,8 @@ pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
             .as_slice(),
     )
     .map(Executors)
-    .map_err(|e| error::Error::Deserialize(Box::new(e)))
+    .map_err(error::Deserialize::from)
+    .map_err(error::Error::Deserialize)
 }
 
 /// Creates a new [`Executors`](struct.Executors.html) based on the json provided through `std::io::stdin`
@@ -251,7 +253,8 @@ pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Executors> {
 /// If the json provided cannot be deserialized, then [`Error(Deserialize)`](../error/struct.Error.html)
 pub fn load_from_stdin() -> Result<Executors> {
     let executors: Vec<Executor> = serde_json::from_reader(std::io::stdin())
-        .map_err(|e| error::Error::Deserialize(Box::new(e)))?;
+        .map_err(error::Deserialize::from)
+        .map_err(error::Error::Deserialize)?;
     Ok(Executors(
         executors.into_iter().map(Executor::clean_up_name).collect(),
     ))
@@ -307,7 +310,8 @@ impl Executors {
             std::fs::create_dir_all(&parent).map_err(|e| error::Error::Write(parent.into(), e))?;
         }
         let bytes = bincode::serialize(self.executors())
-            .map_err(|e| error::Error::Serialize(Box::new(e)))?;
+            .map_err(error::Serialize::from)
+            .map_err(error::Error::Serialize)?;
         std::fs::write(&path, bytes).map_err(|e| error::Error::Write(path.as_ref().into(), e))
     }
 
@@ -317,7 +321,9 @@ impl Executors {
     ///
     /// * If the configuration cannot be serialized, then [`Error(Serialize)`](../error/struct.Error.html)
     pub fn to_json(&self) -> Result<String> {
-        serde_json::to_string_pretty(&self).map_err(|e| error::Error::Serialize(Box::new(e)))
+        serde_json::to_string_pretty(&self)
+            .map_err(error::Serialize::from)
+            .map_err(error::Error::Serialize)
     }
 
     /// Get the target that matches the provided `name`

@@ -69,11 +69,13 @@ impl DuckPhrase {
 pub fn parse(parser: &Parser, result: &str) -> Result<Vec<String>> {
     match parser {
         Parser::Google => Ok(serde_json::from_str::<Google>(result)
-            .map_err(|e| error::Error::Parse(Box::new(e)))?
+            .map_err(error::Parse::from)
+            .map_err(error::Error::Parse)?
             .0),
         Parser::Duck => Ok(serde_json::from_str::<Duck>(result)
             .map(Duck::phrases)
-            .map_err(|e| error::Error::Parse(Box::new(e)))?
+            .map_err(error::Parse::from)
+            .map_err(error::Error::Parse)?
             .into_iter()
             .map(DuckPhrase::phrase)
             .collect()),
